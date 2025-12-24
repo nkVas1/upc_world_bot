@@ -83,14 +83,46 @@ def check_env():
 
 
 def check_dependencies():
-    """Check Python dependencies."""
+    """Check Python dependencies in venv."""
     try:
-        import telegram
-        print_success("python-telegram-bot установлен")
-    except ImportError:
-        print_error("python-telegram-bot не установлен!")
-        print_info("info", "Выполните: pip install -r requirements.txt")
-        sys.exit(1)
+        # Check if dependencies are installed in venv
+        result = subprocess.run(
+            [str(Config.PYTHON_EXECUTABLE), "-c", "import telegram; print('ok')"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode != 0:
+            print_error("Зависимости не установлены в виртуальной среде!")
+            print_info("setup", "Переустанавливаю зависимости...")
+            
+            # Reinstall requirements
+            subprocess.run(
+                [str(Config.PYTHON_EXECUTABLE), "-m", "pip", "install", "-r", "requirements.txt"],
+                cwd=str(Config.PROJECT_ROOT),
+                check=True,
+                capture_output=True
+            )
+            print_success("Зависимости установлены")
+        else:
+            print_success("Все зависимости установлены в venv")
+            
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print_error(f"Ошибка проверки зависимостей: {e}")
+        print_info("info", "Пытаюсь переустановить зависимости...")
+        
+        try:
+            subprocess.run(
+                [str(Config.PYTHON_EXECUTABLE), "-m", "pip", "install", "-r", "requirements.txt"],
+                cwd=str(Config.PROJECT_ROOT),
+                check=True,
+                capture_output=True
+            )
+            print_success("Зависимости установлены")
+        except subprocess.CalledProcessError as install_error:
+            print_error(f"Ошибка установки зависимостей: {install_error}")
+            sys.exit(1)
 
 
 def check_directories():
@@ -172,31 +204,23 @@ def stop_bot():
 
 def setup_venv():
     """Setup virtual environment."""
-    if Config.VENV_PATH.exists():
+    venv_exists = Config.VENV_PATH.exists()
+    
+    if not venv_exists:
+        print_info("setup", "Создаю виртуальную среду...")
+        
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "venv", str(Config.VENV_PATH)],
+                check=True,
+                capture_output=True
+            )
+            print_success("Виртуальная среда создана")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Ошибка создания venv: {e}")
+            sys.exit(1)
+    else:
         print_success("Виртуальная среда уже существует")
-        return
-    
-    print_info("setup", "Создаю виртуальную среду...")
-    
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "venv", str(Config.VENV_PATH)],
-            check=True
-        )
-        print_success("Виртуальная среда создана")
-        
-        # Install requirements
-        print_info("setup", "Устанавливаю зависимости...")
-        subprocess.run(
-            [str(Config.PYTHON_EXECUTABLE), "-m", "pip", "install", "-r", "requirements.txt"],
-            cwd=str(Config.PROJECT_ROOT),
-            check=True
-        )
-        print_success("Зависимости установлены")
-        
-    except subprocess.CalledProcessError as e:
-        print_error(f"Ошибка установки: {e}")
-        sys.exit(1)
 
 
 def main():

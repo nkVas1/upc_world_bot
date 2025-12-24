@@ -1,5 +1,5 @@
 """Configuration management using pydantic-settings."""
-from typing import List
+from typing import List, Union
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -63,7 +63,19 @@ class Settings(BaseSettings):
     @classmethod
     def parse_admin_ids(cls, v):
         if isinstance(v, str):
+            # Try to parse as JSON list first
+            if v.startswith("["):
+                import json
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            # Otherwise parse as comma-separated
             return [int(id.strip()) for id in v.split(",") if id.strip()]
+        elif isinstance(v, list):
+            return v
+        elif isinstance(v, int):
+            return [v]
         return v
     
     @field_validator("encryption_key")

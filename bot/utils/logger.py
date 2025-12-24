@@ -1,5 +1,6 @@
 """Structured logging configuration."""
 import sys
+import logging
 import structlog
 from pathlib import Path
 from bot.config import settings
@@ -7,6 +8,9 @@ from bot.config import settings
 
 def configure_logging():
     """Configure structured logging."""
+    
+    # Map log level string to logging level
+    log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
     
     processors = [
         structlog.contextvars.merge_contextvars,
@@ -23,9 +27,7 @@ def configure_logging():
     
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(structlog.stdlib, settings.log_level)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(log_level),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
         cache_logger_on_first_use=True,

@@ -53,7 +53,7 @@ def upgrade() -> None:
         sa.Column('amount', sa.Integer(), nullable=False),
         sa.Column('balance_after', sa.Integer(), nullable=False),
         sa.Column('description', sa.String(length=255), nullable=True),
-        sa.Column('metadata', postgresql.JSONB(), nullable=True),
+        sa.Column('extra_metadata', postgresql.JSONB(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_transaction_user_id'),
         sa.PrimaryKeyConstraint('id'),

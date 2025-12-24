@@ -110,7 +110,7 @@ class Transaction(Base):
     
     # Description
     description: Mapped[str] = mapped_column(String(500), nullable=False)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    extra_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     
     # Payment integration
     payment_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

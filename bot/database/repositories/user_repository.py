@@ -80,7 +80,7 @@ class UserRepository:
             amount=amount,
             balance_after=user.up_coins,
             description=description,
-            metadata=metadata or {}
+            extra_metadata=metadata or {}
         )
         self.session.add(transaction)
         await self.session.flush()
@@ -119,7 +119,7 @@ class UserRepository:
             amount=-amount,
             balance_after=user.up_coins,
             description=description,
-            metadata=metadata or {}
+            extra_metadata=metadata or {}
         )
         self.session.add(transaction)
         await self.session.flush()
