@@ -11,8 +11,12 @@ from bot.database.repositories.user_repository import UserRepository
 from bot.utils.decorators import handle_errors
 from bot.utils.formatters import fmt
 from bot.utils.logger import logger
+from bot.middlewares.auth import auth_middleware
+from bot.middlewares.logging import logging_middleware
 
 
+@auth_middleware
+@logging_middleware
 @handle_errors
 async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show shop main menu."""
@@ -35,6 +39,8 @@ async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
+@auth_middleware
+@logging_middleware
 @handle_errors
 async def shop_tickets_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show available ticket types."""

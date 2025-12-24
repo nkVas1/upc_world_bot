@@ -11,8 +11,12 @@ from bot.database.models import User
 from bot.utils.decorators import admin_only, handle_errors
 from bot.utils.formatters import fmt
 from bot.utils.logger import logger
+from bot.middlewares.auth import auth_middleware
+from bot.middlewares.logging import logging_middleware
 
 
+@auth_middleware
+@logging_middleware
 @admin_only
 @handle_errors
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

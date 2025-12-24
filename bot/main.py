@@ -24,11 +24,6 @@ from bot.handlers.referral import register_referral_handlers
 from bot.handlers.shop import register_shop_handlers
 from bot.handlers.admin import register_admin_handlers
 
-# Import middlewares
-from bot.middlewares.auth import AuthMiddleware
-from bot.middlewares.throttling import ThrottlingMiddleware
-from bot.middlewares.logging import LoggingMiddleware
-
 
 async def error_handler(update: object, context) -> None:
     """Handle errors."""
@@ -148,11 +143,6 @@ def main() -> None:
         
         # Register error handler
         application.add_error_handler(error_handler)
-        
-        # Register middlewares (in order of execution)
-        application.add_middleware(LoggingMiddleware())
-        application.add_middleware(ThrottlingMiddleware())
-        application.add_middleware(AuthMiddleware())
         
         # Register command handlers
         application.add_handler(CommandHandler("help", help_command))

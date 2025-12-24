@@ -1,72 +1,61 @@
-"""Rate limiting middleware."""
-from typing import Callable, Any, Awaitable
+"""Throttling middleware for rate limiting."""
+from functools import wraps
 from datetime import datetime, timedelta
-from collections import defaultdict
-
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from bot.config import settings
 from bot.utils.logger import logger
 
 
-class ThrottlingMiddleware:
-    """Middleware for rate limiting."""
+# In-memory storage for throttling (можно заменить на Redis в production)
+_throttle_storage = {}
+
+
+def throttling_middleware(rate: int = 3, per: int = 60):
+    """
+    Middleware decorator for rate limiting.
     
-    def __init__(self):
-        self.user_requests: dict[int, list[datetime]] = defaultdict(list)
-        self.rate_limit = settings.rate_limit_requests
-        self.period = settings.rate_limit_period
-    
-    def _is_rate_limited(self, user_id: int) -> bool:
-        """Check if user is rate limited."""
-        now = datetime.utcnow()
-        cutoff = now - timedelta(seconds=self.period)
-        
-        # Remove old requests
-        self.user_requests[user_id] = [
-            req_time for req_time in self.user_requests[user_id]
-            if req_time > cutoff
-        ]
-        
-        # Check limit
-        if len(self.user_requests[user_id]) >= self.rate_limit:
-            return True
-        
-        # Add current request
-        self.user_requests[user_id].append(now)
-        return False
-    
-    async def __call__(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-        handler: Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[Any]]
-    ) -> Any:
-        """Process update through middleware."""
-        if not update.effective_user:
-            return await handler(update, context)
-        
-        user_id = update.effective_user.id
-        
-        # Skip rate limiting for admins
-        if settings.is_admin(user_id):
-            return await handler(update, context)
-        
-        if self._is_rate_limited(user_id):
-            logger.warning("rate_limit_exceeded", user_id=user_id)
+    Args:
+        rate: Number of allowed requests
+        per: Time period in seconds
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+            if not update.effective_user:
+                return await func(update, context, *args, **kwargs)
             
-            if update.message:
-                await update.message.reply_text(
-                    "⏱ Вы отправляете сообщения слишком часто. "
-                    "Пожалуйста, подождите немного."
-                )
-            elif update.callback_query:
-                await update.callback_query.answer(
-                    "⏱ Слишком много запросов. Подождите немного.",
-                    show_alert=True
-                )
+            user_id = update.effective_user.id
+            key = f"throttle:{user_id}:{func.__name__}"
             
-            return None
+            now = datetime.now()
+            
+            # Check if user is throttled
+            if key in _throttle_storage:
+                requests, reset_time = _throttle_storage[key]
+                
+                if now < reset_time:
+                    if requests >= rate:
+                        logger.warning(
+                            "rate_limit_exceeded",
+                            user_id=user_id,
+                            handler=func.__name__
+                        )
+                        if update.message:
+                            await update.message.reply_text(
+                                "⏱ Слишком много запросов. Подождите немного."
+                            )
+                        return
+                    else:
+                        _throttle_storage[key] = (requests + 1, reset_time)
+                else:
+                    # Reset throttle window
+                    _throttle_storage[key] = (1, now + timedelta(seconds=per))
+            else:
+                # First request
+                _throttle_storage[key] = (1, now + timedelta(seconds=per))
+            
+            return await func(update, context, *args, **kwargs)
         
-        return await handler(update, context)
+        return wrapper
+    return decorator

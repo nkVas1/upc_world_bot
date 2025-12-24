@@ -11,8 +11,12 @@ from bot.utils.decorators import handle_errors
 from bot.utils.formatters import fmt
 from bot.config import settings
 from bot.utils.logger import logger
+from bot.middlewares.auth import auth_middleware
+from bot.middlewares.logging import logging_middleware
 
 
+@auth_middleware
+@logging_middleware
 @handle_errors
 async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show referral program main menu."""

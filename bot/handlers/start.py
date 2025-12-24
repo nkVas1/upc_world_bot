@@ -8,8 +8,14 @@ from bot.database.session import db_manager
 from bot.services.user_service import UserService
 from bot.utils.decorators import handle_errors
 from bot.utils.logger import logger
+from bot.middlewares.auth import auth_middleware
+from bot.middlewares.logging import logging_middleware
+from bot.middlewares.throttling import throttling_middleware
 
 
+@auth_middleware
+@logging_middleware
+@throttling_middleware()
 @handle_errors
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
@@ -54,6 +60,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info("start_command", user_id=user.id, is_new=is_new)
 
 
+@auth_middleware
+@logging_middleware
 @handle_errors
 async def main_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle back to main menu callback."""

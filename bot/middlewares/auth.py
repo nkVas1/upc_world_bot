@@ -1,42 +1,41 @@
-"""Authentication middleware."""
-from typing import Callable, Dict, Any, Awaitable
-
+"""Authentication middleware for handlers."""
+from functools import wraps
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.database.session import db_manager
-from bot.services.user_service import UserService
+from bot.database.repositories.user_repository import UserRepository
 from bot.utils.logger import logger
 
 
-class AuthMiddleware:
-    """Middleware for user authentication and registration."""
-    
-    async def __call__(
-        self,
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE,
-        handler: Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[Any]]
-    ) -> Any:
-        """Process update through middleware."""
+def auth_middleware(func):
+    """
+    Middleware decorator for authenticating users.
+    Fetches user from database and adds to context.
+    """
+    @wraps(func)
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         if not update.effective_user:
-            return await handler(update, context)
+            return await func(update, context, *args, **kwargs)
         
-        async with db_manager.session() as session:
-            user_service = UserService(session)
-            
-            # Get or create user
-            user = await user_service.get_or_create_user(update.effective_user)
-            
-            # Store user in context for handlers
-            context.user_data["db_user"] = user
-            context.user_data["user_id"] = user.id
-            
-            logger.info(
-                "user_authenticated",
-                user_id=user.id,
-                username=user.username,
-                handler=handler.__name__ if hasattr(handler, "__name__") else "unknown"
+        user_id = update.effective_user.id
+        
+        try:
+            # Get or create user in database
+            async with db_manager.session() as session:
+                user_repo = UserRepository(session)
+                db_user = await user_repo.get_by_id(user_id)
+                
+                # Store in context for handlers
+                context.user_data["db_user"] = db_user
+                context.user_data["user_id"] = user_id
+        except Exception as e:
+            logger.error(
+                "auth_middleware_error",
+                user_id=user_id,
+                error=str(e)
             )
         
-        return await handler(update, context)
+        return await func(update, context, *args, **kwargs)
+    
+    return wrapper
