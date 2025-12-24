@@ -1,0 +1,183 @@
+"""Main bot entry point."""
+import asyncio
+import sys
+from datetime import datetime
+
+from telegram import Update, BotCommand
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+)
+
+from bot.config import settings
+from bot.database.session import db_manager
+from bot.database.base import Base
+from bot.utils.logger import logger
+
+# Import handlers
+from bot.handlers.start import register_start_handlers
+from bot.handlers.profile import register_profile_handlers
+from bot.handlers.referral import register_referral_handlers
+from bot.handlers.shop import register_shop_handlers
+from bot.handlers.admin import register_admin_handlers
+
+# Import middlewares
+from bot.middlewares.auth import AuthMiddleware
+from bot.middlewares.throttling import ThrottlingMiddleware
+from bot.middlewares.logging import LoggingMiddleware
+
+
+async def error_handler(update: object, context) -> None:
+    """Handle errors."""
+    logger.error(
+        "exception_during_update",
+        error=str(context.error),
+        update=str(update) if update else None
+    )
+    
+    if isinstance(update, Update) and update.effective_message:
+        await update.effective_message.reply_text(
+            "😔 Произошла ошибка при обработке вашего запроса.\n"
+            "Попробуйте /start для перезапуска."
+        )
+
+
+async def help_command(update: Update, context) -> None:
+    """Handle /help command."""
+    text = (
+        "ℹ️ *Помощь*\n\n"
+        "*Основные команды:*\n"
+        "/start \\- Запустить бота\n"
+        "/profile \\- Ваш профиль\n"
+        "/referral \\- Реферальная программа\n"
+        "/daily \\- Ежедневный бонус\n"
+        "/help \\- Эта справка\n\n"
+        "*О клубе:*\n"
+        "Under People Club \\- это молодёжное студенческое сообщество, "
+        "организующее незабываемые вечеринки в Москве\\.\n\n"
+        "*Поддержка:*\n"
+        "Telegram: @underpeople\\_club\n"
+        "Сайт: underpeople\\.club"
+    )
+    
+    await update.message.reply_text(
+        text,
+        parse_mode="MarkdownV2"
+    )
+
+
+async def about_command(update: Update, context) -> None:
+    """Handle /about command."""
+    text = (
+        "🌑 *Under People Club*\n\n"
+        "Мы \\- молодёжное студенческое сообщество, создающее "
+        "атмосферу свободы и креатива на наших мероприятиях\\.\n\n"
+        "*Что мы делаем:*\n"
+        "• Организуем FreeBar вечеринки\n"
+        "• Тематические мероприятия\n"
+        "• Специальные события для студентов\n"
+        "• Создаём пространство для знакомств\n\n"
+        "*История:*\n"
+        "Мы начали 5 лет назад в кругу студентов МГСУ, "
+        "и с каждым разом наши мероприятия становятся всё лучше\\!\n\n"
+        "*На наших вечеринках:*\n"
+        "• DJ сеты\n"
+        "• Кальяны\n"
+        "• Конкурсы и развлечения\n"
+        "• Профессиональная фото/видео съёмка\n"
+        "• Стильные фотозоны\n\n"
+        "Присоединяйся к нам\\!"
+    )
+    
+    await update.message.reply_text(
+        text,
+        parse_mode="MarkdownV2"
+    )
+
+
+async def post_init(application: Application) -> None:
+    """Initialize database and other resources."""
+    logger.info("initializing_bot")
+    
+    # Initialize database
+    db_manager.init()
+    
+    # Create tables if they don't exist
+    async with db_manager.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    logger.info("database_tables_created")
+    
+    # Set bot commands
+    commands = [
+        BotCommand("start", "Запустить бота"),
+        BotCommand("profile", "Мой профиль"),
+        BotCommand("referral", "Реферальная программа"),
+        BotCommand("daily", "Ежедневный бонус"),
+        BotCommand("help", "Помощь"),
+        BotCommand("about", "О клубе"),
+    ]
+    
+    await application.bot.set_my_commands(commands)
+    logger.info("bot_commands_set")
+
+
+async def post_shutdown(application: Application) -> None:
+    """Cleanup resources."""
+    logger.info("shutting_down_bot")
+    await db_manager.dispose()
+    logger.info("bot_shutdown_complete")
+
+
+def main() -> None:
+    """Start the bot."""
+    logger.info("starting_upc_world_bot", version="3.0")
+    
+    try:
+        # Create application
+        application = (
+            Application.builder()
+            .token(settings.bot_token)
+            .post_init(post_init)
+            .post_shutdown(post_shutdown)
+            .build()
+        )
+        
+        # Register error handler
+        application.add_error_handler(error_handler)
+        
+        # Register middlewares (in order of execution)
+        application.add_middleware(LoggingMiddleware())
+        application.add_middleware(ThrottlingMiddleware())
+        application.add_middleware(AuthMiddleware())
+        
+        # Register command handlers
+        application.add_handler(CommandHandler("help", help_command))
+        application.add_handler(CommandHandler("about", about_command))
+        
+        # Register module handlers
+        register_start_handlers(application)
+        register_profile_handlers(application)
+        register_referral_handlers(application)
+        register_shop_handlers(application)
+        register_admin_handlers(application)
+        
+        # Start bot
+        logger.info("bot_started", mode="polling")
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
+        
+    except KeyboardInterrupt:
+        logger.info("bot_stopped_by_user")
+    except Exception as e:
+        logger.error("bot_startup_error", error=str(e))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

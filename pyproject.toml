@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "upc-world-bot"
+version = "3.0.0"
+description = "Modern Telegram Bot for Under People Club"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+authors = [
+    {name = "Under People Club", email = "tech@underpeople.club"},
+]
+keywords = ["telegram", "bot", "python", "async"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: BBS",
+]
+
+dependencies = [
+    "python-telegram-bot[all]==21.6",
+    "sqlalchemy[asyncio]==2.0.25",
+    "asyncpg==0.29.0",
+    "psycopg[binary]==3.1.14",
+    "redis[hiredis]==5.2.0",
+    "pydantic==2.5.0",
+    "pydantic-settings==2.1.0",
+    "httpx==0.25.2",
+    "qrcode[pil]==7.4.2",
+    "pillow==10.1.0",
+    "structlog==23.2.0",
+    "python-dotenv==1.0.0",
+    "cryptography==41.0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "pytest-cov==4.1.0",
+    "black==23.12.1",
+    "flake8==6.1.0",
+    "mypy==1.7.1",
+    "isort==5.13.2",
+    "bandit==1.7.5",
+    "radon==6.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/underpeople/upc-world-bot"
+Repository = "https://github.com/underpeople/upc-world-bot.git"
+Issues = "https://github.com/underpeople/upc-world-bot/issues"
+
+[tool.setuptools]
+packages = ["bot"]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --strict-markers"
+
+[tool.pylint]
+max-line-length = 100
+disable = [
+    "C0111",  # missing-docstring
+    "R0903",  # too-few-public-methods
+]
