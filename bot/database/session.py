@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool, QueuePool
+from sqlalchemy.pool import NullPool
 
 from bot.config import settings
 from bot.utils.logger import logger
@@ -23,24 +23,13 @@ class DatabaseManager:
     
     def init(self) -> None:
         """Initialize database engine and session factory."""
-        if settings.database_url.startswith("sqlite"):
-            # SQLite doesn't support connection pooling
-            self._engine = create_async_engine(
-                settings.database_url,
-                echo=settings.log_level == "DEBUG",
-                poolclass=NullPool,
-            )
-        else:
-            # PostgreSQL with connection pooling
-            self._engine = create_async_engine(
-                settings.database_url,
-                echo=settings.log_level == "DEBUG",
-                poolclass=QueuePool,
-                pool_size=20,
-                max_overflow=10,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-            )
+        # For async engines, we must use NullPool or AsyncAdaptedQueuePool
+        # QueuePool is not compatible with asyncio
+        self._engine = create_async_engine(
+            settings.database_url,
+            echo=settings.log_level == "DEBUG",
+            poolclass=NullPool,  # Required for asyncio compatibility
+        )
         
         self._session_factory = async_sessionmaker(
             bind=self._engine,
