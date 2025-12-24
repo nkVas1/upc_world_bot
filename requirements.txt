@@ -16,7 +16,7 @@ aioredis==2.0.1
 # Web integration
 aiohttp==3.11.7
 httpx==0.27.2
-pydantic==2.10.2
+pydantic==2.9.2
 pydantic-settings==2.6.1
 
 # QR & Image processing
