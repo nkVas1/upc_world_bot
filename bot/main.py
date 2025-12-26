@@ -1,7 +1,66 @@
 """Main bot entry point."""
 import asyncio
 import sys
+import os
 from datetime import datetime
+
+# CRITICAL: Print to stdout for Railway logs BEFORE any imports
+print("=" * 60)
+print("🚀 Starting UPC World Bot v3.0")
+print("=" * 60)
+print(f"Python version: {sys.version}")
+print(f"Working directory: {os.getcwd()}")
+print()
+
+# Print environment variables (masked sensitive data)
+print("Environment variables:")
+env_vars = [
+    "BOT_TOKEN", "BOT_USERNAME", "DATABASE_URL", "REDIS_URL",
+    "WEBSITE_URL", "LOG_LEVEL", "LOG_FORMAT"
+]
+for var in env_vars:
+    value = os.getenv(var, "NOT SET")
+    # Mask sensitive data
+    if var in ["BOT_TOKEN", "DATABASE_URL", "REDIS_URL"] and value != "NOT SET":
+        if "://" in value:
+            # Show only protocol and host
+            parts = value.split("://")
+            if len(parts) > 1:
+                protocol = parts[0]
+                rest = parts[1].split("@")
+                if len(rest) > 1:
+                    host = rest[-1]
+                    value = f"{protocol}://***@{host}"
+                else:
+                    value = f"{protocol}://***"
+        else:
+            value = value[:10] + "***" if len(value) > 10 else "***"
+    print(f"  {var}: {value}")
+print()
+
+try:
+    print("Loading configuration...")
+    from bot.config import settings
+    print("✅ Configuration loaded successfully")
+    print(f"  Bot username: @{settings.bot_username}")
+    print(f"  Admin IDs: {settings.admin_ids}")
+    print(f"  Log level: {settings.log_level}")
+    print()
+except Exception as e:
+    print("=" * 60)
+    print("❌ CRITICAL ERROR: Failed to load configuration")
+    print("=" * 60)
+    print(f"Error type: {type(e).__name__}")
+    print(f"Error message: {str(e)}")
+    print()
+    print("This usually means:")
+    print("1. Required environment variables are missing")
+    print("2. Invalid environment variable values")
+    print("3. Check your Railway Variables settings")
+    print()
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
 
 from telegram import Update, BotCommand
 from telegram.ext import (
@@ -11,8 +70,6 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-
-from bot.config import settings
 from bot.database.session import db_manager
 from bot.database.base import Base
 from bot.utils.logger import logger

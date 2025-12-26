@@ -123,4 +123,19 @@ class Settings(BaseSettings):
 
 
 # Global settings instance
-settings = Settings()
+try:
+    settings = Settings()
+except Exception as e:
+    import sys
+    print("=" * 60, file=sys.stderr)
+    print("❌ FAILED TO INITIALIZE SETTINGS", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+    print(f"Error: {e}", file=sys.stderr)
+    print(file=sys.stderr)
+    print("Check your environment variables:", file=sys.stderr)
+    print("  - BOT_TOKEN", file=sys.stderr)
+    print("  - BOT_USERNAME", file=sys.stderr)
+    print("  - DATABASE_URL", file=sys.stderr)
+    print("  - REDIS_URL", file=sys.stderr)
+    print(file=sys.stderr)
+    raise
