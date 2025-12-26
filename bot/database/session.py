@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 
 from bot.config import settings
 from bot.utils.logger import logger
@@ -23,12 +23,16 @@ class DatabaseManager:
     
     def init(self) -> None:
         """Initialize database engine and session factory."""
-        # For async engines, we must use NullPool or AsyncAdaptedQueuePool
-        # QueuePool is not compatible with asyncio
+        # Use AsyncAdaptedQueuePool for better connection management
         self._engine = create_async_engine(
             settings.database_url,
             echo=settings.log_level == "DEBUG",
-            poolclass=NullPool,  # Required for asyncio compatibility
+            poolclass=AsyncAdaptedQueuePool,
+            pool_size=5,  # Maximum connections in pool
+            max_overflow=10,  # Extra connections when pool exhausted
+            pool_timeout=30,  # Timeout waiting for connection
+            pool_recycle=3600,  # Recycle connections after 1 hour
+            pool_pre_ping=True,  # Test connections before using
         )
         
         self._session_factory = async_sessionmaker(
@@ -59,7 +63,14 @@ class DatabaseManager:
             await session.commit()
         except Exception as e:
             await session.rollback()
-            logger.error("database_session_error", error=str(e))
+            # Add full traceback for debugging
+            import traceback
+            logger.error(
+                "database_session_error", 
+                error=str(e),
+                error_type=type(e).__name__,
+                traceback=traceback.format_exc()
+            )
             raise
         finally:
             await session.close()

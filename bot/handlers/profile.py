@@ -24,27 +24,36 @@ from bot.middlewares.logging import logging_middleware
 @handle_errors
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show user profile."""
-    async with db_manager.session() as session:
-        user_service = UserService(session)
-        profile = await user_service.get_user_profile(update.callback_query.from_user.id)
-        
-        if not profile:
-            text = "❌ Профиль не найден"
+    try:
+        async with db_manager.session() as session:
+            user_service = UserService(session)
+            profile = await user_service.get_user_profile(update.callback_query.from_user.id)
+            
+            if not profile:
+                text = "❌ Профиль не найден"
+                await NavigationManager.send_or_edit(
+                    update,
+                    context,
+                    text,
+                    reply_markup=None
+                )
+                return
+            
+            text = fmt.format_user_profile(profile)
+            
             await NavigationManager.send_or_edit(
                 update,
                 context,
                 text,
-                reply_markup=None
+                reply_markup=kb.profile_menu(update.callback_query.from_user.id)
             )
-            return
-        
-        text = fmt.format_user_profile(profile)
-        
+    except Exception as e:
+        logger.error("profile_callback_error", error=str(e))
         await NavigationManager.send_or_edit(
             update,
             context,
-            text,
-            reply_markup=kb.profile_menu(update.callback_query.from_user.id)
+            "\ud83d\ude14 \u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u043f\u0440\u043e\u0444\u0438\u043b\u044f\\.\n\u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u043f\u043e\u0437\u0436\u0435\\.",
+            reply_markup=None
         )
 
 
