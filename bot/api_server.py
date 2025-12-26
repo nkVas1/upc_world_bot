@@ -18,6 +18,7 @@ from bot.config import settings
 from bot.database.session import db_manager
 from bot.database.repositories.user_repository import UserRepository
 from bot.utils.logger import logger
+from bot.utils.token_storage import TokenStorage
 
 
 # ========== SETUP ==========
@@ -39,21 +40,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
-
-# ========== AUTH CODE STORAGE ==========
-# In production, use Redis instead of in-memory storage
-# Format: {code: user_id, expires_at: timestamp}
-auth_codes: dict = {}
-
-def cleanup_expired_codes():
-    """Remove expired auth codes (older than 15 minutes)."""
-    current_time = time.time()
-    expired = [code for code, data in auth_codes.items() 
-               if current_time - data.get("created_at", 0) > 900]  # 15 minutes
-    for code in expired:
-        del auth_codes[code]
-    if expired:
-        logger.info("auth_codes_cleanup", removed_count=len(expired))
 
 
 # ========== MODELS ==========
@@ -173,23 +159,6 @@ def verify_access_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def generate_auth_code(user_id: int) -> str:
-    """Generate one-time auth code."""
-    # Cleanup expired codes every 10 minutes
-    if len(auth_codes) % 10 == 0:
-        cleanup_expired_codes()
-    
-    code = str(uuid4())
-    auth_codes[code] = {
-        "user_id": user_id,
-        "created_at": time.time(),
-        "used": False
-    }
-    
-    logger.info("auth_code_generated", code=code[:8] + "...", user_id=user_id)
-    return code
-
-
 # ========== ENDPOINTS ==========
 @app.post("/api/auth/code/exchange", response_model=AuthResponse)
 async def exchange_auth_code(request: AuthCodeRequest):
@@ -208,37 +177,15 @@ async def exchange_auth_code(request: AuthCodeRequest):
     try:
         code = request.code
         
-        # Cleanup old codes
-        cleanup_expired_codes()
+        # Exchange code using TokenStorage (one-time use, validates TTL)
+        user_id = TokenStorage.get_user_id(code)
         
-        # Find code in storage
-        code_data = auth_codes.get(code)
-        if not code_data:
-            logger.warning("auth_code_not_found", code=code[:8] + "...")
+        if not user_id:
+            logger.warning("auth_code_not_found_or_expired", code=code[:8] + "...")
             raise HTTPException(
                 status_code=403,
                 detail="Invalid or expired auth code"
             )
-        
-        # Check if code is older than 15 minutes
-        age_seconds = time.time() - code_data.get("created_at", 0)
-        if age_seconds > 900:  # 15 minutes
-            del auth_codes[code]
-            logger.warning("auth_code_expired", code=code[:8] + "...", age_seconds=age_seconds)
-            raise HTTPException(
-                status_code=403,
-                detail="Auth code expired (max 15 minutes)"
-            )
-        
-        # Check if already used
-        if code_data.get("used"):
-            logger.warning("auth_code_reused", code=code[:8] + "...")
-            raise HTTPException(
-                status_code=403,
-                detail="Auth code already used"
-            )
-        
-        user_id = code_data["user_id"]
         
         # Get user from database
         async with db_manager.session() as session:
@@ -251,10 +198,6 @@ async def exchange_auth_code(request: AuthCodeRequest):
                     status_code=404,
                     detail="User not found"
                 )
-        
-        # Mark code as used and delete it
-        auth_codes[code]["used"] = True
-        del auth_codes[code]
         
         # Generate JWT token
         access_token = create_access_token(
@@ -296,7 +239,7 @@ async def exchange_auth_code(request: AuthCodeRequest):
 async def generate_auth_code_endpoint(user_id: int = Body(..., embed=True)):
     """
     Generate one-time auth code and return redirect URL.
-    This is called by the bot when user clicks "Войти на сайт" button.
+    This is called by the bot when user needs auth code.
     
     The returned URL will be used as a deep link that returns the user to the website
     with the auth code in the query string.
@@ -314,8 +257,9 @@ async def generate_auth_code_endpoint(user_id: int = Body(..., embed=True)):
                     detail="User not found"
                 )
         
-        # Generate code
-        code = generate_auth_code(user_id)
+        # Generate code using TokenStorage
+        code = str(uuid4())
+        TokenStorage.add_code(code, user_id)
         
         # Create redirect URL (website will exchange this code for JWT)
         callback_url = f"{settings.website_url}/auth/callback?code={code}"

@@ -8,6 +8,7 @@ from bot.keyboards.inline import kb
 from bot.keyboards.reply import main_keyboard
 from bot.utils.formatters import fmt
 from bot.utils.navigation import NavigationManager
+from bot.utils.token_storage import TokenStorage
 from bot.database.session import db_manager
 from bot.services.user_service import UserService
 from bot.utils.decorators import handle_errors
@@ -126,18 +127,9 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 logger.warning("login_user_not_found", user_id=user.id)
                 return
         
-        # Generate auth code
+        # Generate auth code and store in TokenStorage (NOT in bot object)
         code = str(uuid4())
-        # Store code in memory (in production, use Redis with TTL)
-        # This will be used by the website to get JWT token
-        if not hasattr(context.bot, "auth_codes"):
-            context.bot.auth_codes = {}
-        
-        context.bot.auth_codes[code] = {
-            "user_id": user.id,
-            "created_at": datetime.utcnow(),
-            "used": False
-        }
+        TokenStorage.add_code(code, user.id)
         
         # Create login URL that returns user to website with auth code
         login_url = f"{settings.website_url}/auth/callback?code={code}"
