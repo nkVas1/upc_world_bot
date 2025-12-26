@@ -53,6 +53,16 @@ class StructuredLogger:
         
     def _log(self, level: int, event: str, **kwargs):
         """Internal log method with structured data."""
+        # CRITICAL: Print to stdout for immediate visibility in Railway
+        if level >= logging.ERROR:
+            print(f"[ERROR] {event}")
+            for key, value in kwargs.items():
+                value_str = str(value)
+                if len(value_str) > 500:
+                    value_str = value_str[:500] + "\n... (truncated)"
+                print(f"  {key}: {value_str}")
+            print()
+        
         # Create log record with extra data
         record = self.logger.makeRecord(
             self.logger.name,
@@ -80,7 +90,21 @@ class StructuredLogger:
         self._log(logging.WARNING, event, **kwargs)
     
     def error(self, event: str, **kwargs):
-        """Log error message."""
+        """Log error message with full details."""
+        # CRITICAL: Always print errors to stdout for Railway logs
+        print("=" * 60)
+        print(f"\u274c ERROR: {event}")
+        print("=" * 60)
+        for key, value in kwargs.items():
+            # Truncate very long values
+            value_str = str(value)
+            if len(value_str) > 2000:
+                value_str = value_str[:2000] + "\n... (truncated)"
+            print(f"{key}:")
+            print(value_str)
+            print()
+        print("=" * 60)
+        
         self._log(logging.ERROR, event, **kwargs)
     
     def critical(self, event: str, **kwargs):

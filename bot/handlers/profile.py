@@ -239,9 +239,16 @@ async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Delete command for cleaner chat
         await NavigationManager.delete_user_command(update)
         
+        print(f"[DEBUG] daily_bonus_command called for user {update.effective_user.id}")
+        
         async with db_manager.session() as session:
+            print(f"[DEBUG] Database session created for daily bonus")
+            
             user_repo = UserRepository(session)
+            print(f"[DEBUG] UserRepository initialized")
+            
             success, bonus = await user_repo.claim_daily_bonus(update.effective_user.id)
+            print(f"[DEBUG] Bonus claim result: success={success}, bonus={bonus}")
             
             if success:
                 user = await user_repo.get_by_id(update.effective_user.id)
@@ -267,6 +274,16 @@ async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             logger.info("daily_bonus_command", user_id=update.effective_user.id, success=success)
     except Exception as e:
+        print("=" * 60)
+        print(f"❌ daily_bonus_error for user {update.effective_user.id}")
+        print("=" * 60)
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Message: {str(e)}")
+        print()
+        import traceback
+        traceback.print_exc()
+        print("=" * 60)
+        
         logger.error("daily_bonus_error", error=str(e), user_id=update.effective_user.id)
         await NavigationManager.send_or_edit(
             update,
@@ -287,9 +304,16 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # Delete user's command message for cleaner chat
         await NavigationManager.delete_user_command(update)
         
+        print(f"[DEBUG] profile_command called for user {update.effective_user.id}")
+        
         async with db_manager.session() as session:
+            print(f"[DEBUG] Database session created")
+            
             user_service = UserService(session)
+            print(f"[DEBUG] UserService initialized")
+            
             profile = await user_service.get_user_profile(update.effective_user.id)
+            print(f"[DEBUG] Profile fetched: {profile is not None}")
             
             if not profile:
                 text = "❌ Профиль не найден\\. Используйте /start"
@@ -312,6 +336,16 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             
             logger.info("profile_command", user_id=update.effective_user.id)
     except Exception as e:
+        print("=" * 60)
+        print(f"❌ profile_command ERROR for user {update.effective_user.id}")
+        print("=" * 60)
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Message: {str(e)}")
+        print()
+        import traceback
+        traceback.print_exc()
+        print("=" * 60)
+        
         logger.error("profile_command_error", error=str(e), user_id=update.effective_user.id)
         await NavigationManager.send_or_edit(
             update,

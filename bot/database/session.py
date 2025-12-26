@@ -63,8 +63,20 @@ class DatabaseManager:
             await session.commit()
         except Exception as e:
             await session.rollback()
-            # Add full traceback for debugging
+            
+            # CRITICAL: Print full error to stdout
+            print("=" * 60)
+            print("\u274c DATABASE SESSION ERROR")
+            print("=" * 60)
+            print(f"Error Type: {type(e).__name__}")
+            print(f"Error Message: {str(e)}")
+            print()
+            print("Full Traceback:")
             import traceback
+            traceback.print_exc()
+            print("=" * 60)
+            
+            # Also log structured
             logger.error(
                 "database_session_error", 
                 error=str(e),
