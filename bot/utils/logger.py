@@ -32,7 +32,15 @@ class StructuredFormatter(logging.Formatter):
             # Plain text format
             msg = record.getMessage()
             if hasattr(record, "extra_data") and record.extra_data:
-                params = ", ".join(f"{k}={v}" for k, v in record.extra_data.items())
+                # Pretty print extra data
+                params_list = []
+                for k, v in record.extra_data.items():
+                    # Truncate long values
+                    v_str = str(v)
+                    if len(v_str) > 500:
+                        v_str = v_str[:500] + "... (truncated)"
+                    params_list.append(f"{k}={v_str}")
+                params = ", ".join(params_list)
                 msg = f"{msg} | {params}"
             return f"[{record.levelname}] {msg}"
 

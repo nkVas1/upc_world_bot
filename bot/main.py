@@ -238,7 +238,25 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("bot_stopped_by_user")
     except Exception as e:
-        logger.error("bot_startup_error", error=str(e))
+        # CRITICAL: Print full error details to stdout
+        print("=" * 60)
+        print("❌ BOT STARTUP ERROR")
+        print("=" * 60)
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        print()
+        print("Full traceback:")
+        import traceback
+        traceback.print_exc()
+        print("=" * 60)
+        
+        # Also log to structured logger
+        logger.error(
+            "bot_startup_error", 
+            error=str(e),
+            error_type=type(e).__name__,
+            traceback=traceback.format_exc()
+        )
         sys.exit(1)
 
 
