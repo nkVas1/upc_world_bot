@@ -177,30 +177,45 @@ async def referral_rules_callback(update: Update, context: ContextTypes.DEFAULT_
     )
 
 
+@auth_middleware
+@logging_middleware
 @handle_errors
 async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /referral command."""
-    async with db_manager.session() as session:
-        user_repo = UserRepository(session)
-        user = await user_repo.get_by_id(update.effective_user.id)
-        
-        if not user:
-            await update.message.reply_text("Сначала используйте /start")
-            return
-        
-        referral_link = f"https://t.me/{settings.bot_username}?start={user.referral_code}"
-        
-        text = (
-            f"🔗 *Твоя реферальная ссылка:*\n\n"
-            f"`{fmt.escape_markdown(referral_link)}`\n\n"
-            f"Код: `{fmt.escape_markdown(user.referral_code)}`\n\n"
-            f"👥 Приглашено: {user.referral_count}\n"
-            f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}"
-        )
-        
+    try:
+        async with db_manager.session() as session:
+            user_repo = UserRepository(session)
+            user = await user_repo.get_by_id(update.effective_user.id)
+            
+            if not user:
+                await update.message.reply_text(
+                    "Сначала используйте /start",
+                    parse_mode="MarkdownV2"
+                )
+                return
+            
+            referral_link = f"https://t.me/{settings.bot_username}?start={user.referral_code}"
+            
+            text = (
+                f"🔗 *Твоя реферальная ссылка:*\n\n"
+                f"`{fmt.escape_markdown(referral_link)}`\n\n"
+                f"Код: `{fmt.escape_markdown(user.referral_code)}`\n\n"
+                f"👥 Приглашено: {user.referral_count}\n"
+                f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}"
+            )
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=kb.referral_menu(user.referral_code),
+                parse_mode="MarkdownV2"
+            )
+            
+            logger.info("referral_command", user_id=update.effective_user.id)
+    except Exception as e:
+        logger.error("referral_command_error", error=str(e), user_id=update.effective_user.id)
         await update.message.reply_text(
-            text,
-            reply_markup=kb.referral_menu(user.referral_code),
+            "😔 Произошла ошибка\\.\n"
+            "Попробуйте /start",
             parse_mode="MarkdownV2"
         )
 

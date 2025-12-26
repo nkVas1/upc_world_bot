@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from bot.keyboards.inline import kb
+from bot.keyboards.reply import main_keyboard
 from bot.database.session import db_manager
 from bot.services.user_service import UserService
 from bot.utils.decorators import handle_errors
@@ -53,7 +54,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     await update.message.reply_text(
         welcome_text,
-        reply_markup=kb.main_menu(db_user.is_member),
+        reply_markup=main_keyboard(db_user.is_member),
         parse_mode="MarkdownV2"
     )
     

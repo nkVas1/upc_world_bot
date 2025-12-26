@@ -80,6 +80,7 @@ from bot.handlers.profile import register_profile_handlers
 from bot.handlers.referral import register_referral_handlers
 from bot.handlers.shop import register_shop_handlers
 from bot.handlers.admin import register_admin_handlers
+from bot.handlers.common import register_common_handlers
 
 
 async def error_handler(update: object, context) -> None:
@@ -211,6 +212,7 @@ def main() -> None:
         register_referral_handlers(application)
         register_shop_handlers(application)
         register_admin_handlers(application)
+        register_common_handlers(application)
         
         # Start bot
         logger.info("bot_started", mode="polling")

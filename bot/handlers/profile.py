@@ -210,36 +210,83 @@ async def sync_website_callback(update: Update, context: ContextTypes.DEFAULT_TY
         )
 
 
+@auth_middleware
+@logging_middleware
 @handle_errors
 async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Claim daily bonus."""
-    async with db_manager.session() as session:
-        user_repo = UserRepository(session)
-        success, bonus = await user_repo.claim_daily_bonus(update.effective_user.id)
-        
-        if success:
-            user = await user_repo.get_by_id(update.effective_user.id)
-            text = (
-                f"🎁 *Ежедневный бонус получен\\!*\n\n"
-                f"\\+ {fmt.format_coins(bonus)}\n"
-                f"🔥 Streak: {user.daily_streak} дней\n\n"
-                f"_Приходи завтра за новым бонусом\\!_"
+    try:
+        async with db_manager.session() as session:
+            user_repo = UserRepository(session)
+            success, bonus = await user_repo.claim_daily_bonus(update.effective_user.id)
+            
+            if success:
+                user = await user_repo.get_by_id(update.effective_user.id)
+                text = (
+                    f"🎁 *Ежедневный бонус получен\\!*\n\n"
+                    f"\\+ {fmt.format_coins(bonus)}\n"
+                    f"🔥 Streak: {user.daily_streak} дней\n\n"
+                    f"_Приходи завтра за новым бонусом\\!_"
+                )
+            else:
+                text = (
+                    "⏱ *Бонус уже получен\\!*\n\n"
+                    "Возвращайся через 24 часа за новым бонусом\\."
+                )
+            
+            await update.message.reply_text(
+                text,
+                parse_mode="MarkdownV2"
             )
-        else:
-            text = (
-                "⏱ *Бонус уже получен\\!*\n\n"
-                "Возвращайся через 24 часа за новым бонусом\\."
-            )
-        
+            
+            logger.info("daily_bonus_command", user_id=update.effective_user.id, success=success)
+    except Exception as e:
+        logger.error("daily_bonus_error", error=str(e), user_id=update.effective_user.id)
         await update.message.reply_text(
-            text,
+            "😔 Произошла ошибка при получении бонуса\\.\n"
+            "Попробуйте позже\\.",
             parse_mode="MarkdownV2"
         )
 
 
 # Register handlers
+@auth_middleware
+@logging_middleware
+@handle_errors
+async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /profile command."""
+    try:
+        async with db_manager.session() as session:
+            user_service = UserService(session)
+            profile = await user_service.get_user_profile(update.effective_user.id)
+            
+            if not profile:
+                await update.message.reply_text(
+                    "❌ Профиль не найден",
+                    parse_mode="MarkdownV2"
+                )
+                return
+            
+            text = fmt.format_user_profile(profile)
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=kb.profile_menu(update.effective_user.id),
+                parse_mode="MarkdownV2"
+            )
+            
+            logger.info("profile_command", user_id=update.effective_user.id)
+    except Exception as e:
+        logger.error("profile_command_error", error=str(e), user_id=update.effective_user.id)
+        await update.message.reply_text(
+            "😔 Ошибка загрузки профиля\\.\nПопробуйте /start",
+            parse_mode="MarkdownV2"
+        )
+
+
 def register_profile_handlers(application):
     """Register profile-related handlers."""
+    application.add_handler(CommandHandler("profile", profile_command))
     application.add_handler(CallbackQueryHandler(profile_callback, pattern="^profile$"))
     application.add_handler(CallbackQueryHandler(transactions_callback, pattern="^transactions$"))
     application.add_handler(CallbackQueryHandler(achievements_callback, pattern="^achievements$"))
