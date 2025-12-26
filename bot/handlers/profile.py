@@ -219,11 +219,6 @@ async def sync_website_callback(update: Update, context: ContextTypes.DEFAULT_TY
             text,
             reply_markup=kb.back_button("profile")
         )
-        await query.edit_message_text(
-            text,
-            reply_markup=kb.back_button("profile"),
-            parse_mode="MarkdownV2"
-        )
 
 
 @auth_middleware

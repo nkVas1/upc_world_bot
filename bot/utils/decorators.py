@@ -82,11 +82,12 @@ def handle_errors(func: Callable) -> Callable:
         try:
             return await func(update, context)
         except Exception as e:
+            error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error(
-                "handler_error",
-                handler=func.__name__,
-                error=str(e),
-                user_id=update.effective_user.id if update.effective_user else None
+                f"error_in_{func.__name__}",
+                error=error_msg,
+                user_id=update.effective_user.id if update.effective_user else None,
+                chat_id=update.effective_chat.id if update.effective_chat else None
             )
             
             error_message = (
@@ -95,11 +96,20 @@ def handle_errors(func: Callable) -> Callable:
                 "Попробуйте /start для перезапуска бота."
             )
             
-            if update.message:
-                await update.message.reply_text(error_message)
-            elif update.callback_query:
-                await update.callback_query.message.reply_text(error_message)
-                await update.callback_query.answer()
+            # Try to inform user about error
+            try:
+                if update.callback_query:
+                    await update.callback_query.answer(
+                        "😔 Произошла ошибка. Попробуйте /start",
+                        show_alert=True
+                    )
+                elif update.message:
+                    await update.message.reply_text(error_message)
+            except Exception as notify_error:
+                logger.error("failed_to_notify_user", error=str(notify_error))
+            
+            # Re-raise for global error handler
+            raise
     
     return wrapper
 

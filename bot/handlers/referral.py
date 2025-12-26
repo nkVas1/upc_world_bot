@@ -147,13 +147,9 @@ async def referral_rewards_callback(update: Update, context: ContextTypes.DEFAUL
         reply_markup=kb.back_button("referral")
     )
 
-
 @handle_errors
 async def referral_rules_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show referral program rules."""
-    query = update.callback_query
-    await query.answer()
-    
     text = (
         "📋 *Правила реферальной программы*\n\n"
         "*Как это работает:*\n\n"
@@ -168,10 +164,11 @@ async def referral_rules_callback(update: Update, context: ContextTypes.DEFAULT_
         "_Чем больше друзей \\- тем больше бонусов\\!_"
     )
     
-    await query.edit_message_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        reply_markup=kb.back_button("referral"),
-        parse_mode="MarkdownV2"
+        reply_markup=kb.back_button("referral")
     )
 
 

@@ -73,6 +73,7 @@ from telegram.ext import (
 from bot.database.session import db_manager
 from bot.database.base import Base
 from bot.utils.logger import logger
+from bot.utils.navigation import NavigationManager
 
 # Import handlers
 from bot.handlers.start import register_start_handlers
@@ -100,31 +101,38 @@ async def error_handler(update: object, context) -> None:
 
 async def help_command(update: Update, context) -> None:
     """Handle /help command."""
+    # Delete user's command for cleaner chat
+    await NavigationManager.delete_user_command(update)
+    
     text = (
         "❓ *СИСТЕМА ПОМОЩИ*\n\n"
         "*Основные команды:*\n"
-        "/start \\- Запустить терминал\n"
-        "/profile \\- Убежище \\(профиль\\)\n"
-        "/referral \\- Связь \\(рефералы\\)\n"
-        "/daily \\- Ежедневный ресурс\n"
-        "/help \\- Эта справка\n\n"
-        "*О клубе:*\n"
-        "Under People Club \\- молодёжное студенческое сообщество, "
-        "организующее незабываемые вечеринки в Москве\\.\n\n"
+        "• `/start` \\- Запустить терминал\n"
+        "• `/profile` \\- Убежище \\(профиль\\)\n"
+        "• `/referral` \\- Связь \\(рефералы\\)\n"
+        "• `/daily` \\- Ежедневный ресурс\n"
+        "• `/help` \\- Эта справка\n"
+        "• `/about` \\- О клубе\n\n"
+        "*Навигация:*\n"
+        "Используйте кнопки меню для быстрого доступа\\.\n\n"
         "*Поддержка:*\n"
         "📱 Telegram: https://t\\.me/underpeople\\_club\n"
         "🌐 Сайт: https://under\\-people\\-club\\.vercel\\.app/"
     )
     
-    await update.message.reply_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        parse_mode="MarkdownV2",
-        disable_web_page_preview=False
+        reply_markup=None
     )
 
 
 async def about_command(update: Update, context) -> None:
     """Handle /about command."""
+    # Delete user's command for cleaner chat
+    await NavigationManager.delete_user_command(update)
+    
     text = (
         "🌑 *UNDER PEOPLE CLUB*\n\n"
         "*Миссия:*\n"
@@ -149,10 +157,11 @@ async def about_command(update: Update, context) -> None:
         "Присоединяйся к нам\\!"
     )
     
-    await update.message.reply_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        parse_mode="MarkdownV2",
-        disable_web_page_preview=False
+        reply_markup=None
     )
 
 
