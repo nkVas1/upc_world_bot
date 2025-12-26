@@ -3,8 +3,10 @@ import hmac
 import hashlib
 import json
 import time
+import asyncio
 from typing import Optional
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +40,22 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+# ========== AUTH CODE STORAGE ==========
+# In production, use Redis instead of in-memory storage
+# Format: {code: user_id, expires_at: timestamp}
+auth_codes: dict = {}
+
+def cleanup_expired_codes():
+    """Remove expired auth codes (older than 15 minutes)."""
+    current_time = time.time()
+    expired = [code for code, data in auth_codes.items() 
+               if current_time - data.get("created_at", 0) > 900]  # 15 minutes
+    for code in expired:
+        del auth_codes[code]
+    if expired:
+        logger.info("auth_codes_cleanup", removed_count=len(expired))
+
+
 # ========== MODELS ==========
 class TelegramAuthData(BaseModel):
     """Telegram Widget Authentication Data."""
@@ -48,6 +66,17 @@ class TelegramAuthData(BaseModel):
     photo_url: Optional[str] = None
     auth_date: int = Field(..., description="Unix timestamp of auth")
     hash: str = Field(..., description="Telegram hash for verification")
+
+
+class AuthCodeRequest(BaseModel):
+    """Request to exchange auth code for token."""
+    code: str = Field(..., description="One-time auth code")
+
+
+class AuthCodeResponse(BaseModel):
+    """Response with authorization code."""
+    code: str
+    url: str
 
 
 class AuthResponse(BaseModel):
@@ -144,7 +173,178 @@ def verify_access_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
+def generate_auth_code(user_id: int) -> str:
+    """Generate one-time auth code."""
+    # Cleanup expired codes every 10 minutes
+    if len(auth_codes) % 10 == 0:
+        cleanup_expired_codes()
+    
+    code = str(uuid4())
+    auth_codes[code] = {
+        "user_id": user_id,
+        "created_at": time.time(),
+        "used": False
+    }
+    
+    logger.info("auth_code_generated", code=code[:8] + "...", user_id=user_id)
+    return code
+
+
 # ========== ENDPOINTS ==========
+@app.post("/api/auth/code/exchange", response_model=AuthResponse)
+async def exchange_auth_code(request: AuthCodeRequest):
+    """
+    Exchange one-time auth code for JWT token.
+    This is called by the website after user clicks bot login link.
+    
+    Flow:
+    1. User clicks "Войти" in Telegram Bot
+    2. Bot generates code and sends deep link with ?code=xxx
+    3. User clicks link, returns to website with code in URL
+    4. Website calls this endpoint with the code
+    5. Website gets JWT token and user data
+    6. Website stores token in localStorage and logs user in
+    """
+    try:
+        code = request.code
+        
+        # Cleanup old codes
+        cleanup_expired_codes()
+        
+        # Find code in storage
+        code_data = auth_codes.get(code)
+        if not code_data:
+            logger.warning("auth_code_not_found", code=code[:8] + "...")
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid or expired auth code"
+            )
+        
+        # Check if code is older than 15 minutes
+        age_seconds = time.time() - code_data.get("created_at", 0)
+        if age_seconds > 900:  # 15 minutes
+            del auth_codes[code]
+            logger.warning("auth_code_expired", code=code[:8] + "...", age_seconds=age_seconds)
+            raise HTTPException(
+                status_code=403,
+                detail="Auth code expired (max 15 minutes)"
+            )
+        
+        # Check if already used
+        if code_data.get("used"):
+            logger.warning("auth_code_reused", code=code[:8] + "...")
+            raise HTTPException(
+                status_code=403,
+                detail="Auth code already used"
+            )
+        
+        user_id = code_data["user_id"]
+        
+        # Get user from database
+        async with db_manager.session() as session:
+            user_repo = UserRepository(session)
+            user = await user_repo.get_by_id(user_id)
+            
+            if not user:
+                logger.error("auth_code_user_not_found", user_id=user_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail="User not found"
+                )
+        
+        # Mark code as used and delete it
+        auth_codes[code]["used"] = True
+        del auth_codes[code]
+        
+        # Generate JWT token
+        access_token = create_access_token(
+            user_id=user_id,
+            username=user.username
+        )
+        
+        logger.info(
+            "auth_code_exchanged",
+            user_id=user_id,
+            code=code[:8] + "..."
+        )
+        
+        return AuthResponse(
+            access_token=access_token,
+            user={
+                "id": user_id,
+                "username": user.username,
+                "first_name": user.first_name,
+                "role": "member" if user.is_member else "guest"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "auth_code_exchange_exception",
+            error=str(e),
+            code=request.code[:8] + "..." if request.code else None
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+
+@app.post("/api/auth/code/generate", response_model=AuthCodeResponse)
+async def generate_auth_code_endpoint(user_id: int = Body(..., embed=True)):
+    """
+    Generate one-time auth code and return redirect URL.
+    This is called by the bot when user clicks "Войти на сайт" button.
+    
+    The returned URL will be used as a deep link that returns the user to the website
+    with the auth code in the query string.
+    """
+    try:
+        # Validate user exists
+        async with db_manager.session() as session:
+            user_repo = UserRepository(session)
+            user = await user_repo.get_by_id(user_id)
+            
+            if not user:
+                logger.warning("auth_code_generate_user_not_found", user_id=user_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail="User not found"
+                )
+        
+        # Generate code
+        code = generate_auth_code(user_id)
+        
+        # Create redirect URL (website will exchange this code for JWT)
+        callback_url = f"{settings.website_url}/auth/callback?code={code}"
+        
+        logger.info(
+            "auth_code_generated_for_user",
+            user_id=user_id,
+            code=code[:8] + "..."
+        )
+        
+        return AuthCodeResponse(
+            code=code,
+            url=callback_url
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "auth_code_generate_exception",
+            error=str(e),
+            user_id=user_id
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
+
+
 @app.post("/api/auth/telegram", response_model=AuthResponse)
 async def telegram_login(auth_data: TelegramAuthData):
     """

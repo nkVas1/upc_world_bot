@@ -181,6 +181,7 @@ async def post_init(application: Application) -> None:
     # Set bot commands
     commands = [
         BotCommand("start", "Запустить бота"),
+        BotCommand("login", "Вход в личный кабинет"),
         BotCommand("profile", "Мой профиль"),
         BotCommand("referral", "Реферальная программа"),
         BotCommand("daily", "Ежедневный бонус"),
