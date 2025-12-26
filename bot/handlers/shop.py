@@ -1,4 +1,4 @@
-"""Shop and tickets handlers."""
+"""Shop and tickets handlers - App-like navigation."""
 from decimal import Decimal
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, CommandHandler
@@ -11,8 +11,12 @@ from bot.database.repositories.user_repository import UserRepository
 from bot.utils.decorators import handle_errors
 from bot.utils.formatters import fmt
 from bot.utils.logger import logger
+from bot.utils.navigation import NavigationManager
 from bot.middlewares.auth import auth_middleware
 from bot.middlewares.logging import logging_middleware
+
+# Brand constants
+WEBSITE_URL = "https://under\\-people\\-club\\.vercel\\.app/"
 
 
 @auth_middleware
@@ -20,22 +24,21 @@ from bot.middlewares.logging import logging_middleware
 @handle_errors
 async def shop_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show shop main menu."""
-    query = update.callback_query
-    await query.answer()
-    
     text = (
-        "🏪 *Магазин Under People Club*\n\n"
-        "Здесь ты можешь приобрести:\n"
-        "• 🎟️ Билеты на события\n"
+        "🏪 *СНАБЖЕНИЕ \\- МАГАЗИН*\n\n"
+        "🌑 *Under People Club Store*\n\n"
+        "Доступные разделы:\n"
+        "• 🎟️ Билеты на рейды\n"
         "• 👕 Эксклюзивный мерч\n"
         "• 🎁 Специальные предложения\n\n"
         "_Используй UP Coins для получения скидок\\!_"
     )
     
-    await query.edit_message_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        reply_markup=kb.shop_menu(),
-        parse_mode="MarkdownV2"
+        reply_markup=kb.shop_menu()
     )
 
 
@@ -159,24 +162,22 @@ async def ticket_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 @handle_errors
 async def shop_merch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show merchandise catalog."""
-    query = update.callback_query
-    await query.answer()
-    
     text = (
-        "👕 *Мерч Under People Club*\n\n"
-        "🔜 Скоро здесь появится наша коллекция мерча:\n\n"
+        "👕 *СНАБЖЕНИЕ \\- МЕРЧ*\n\n"
+        "🔜 Скоро здесь появится наша коллекция:\n\n"
         "• Толстовки с символикой UP\n"
         "• Футболки лимитированных серий\n"
-        "• Аксессуары\n"
-        "• Коллекционные предметы\n\n"
+        "• Аксессуары и патчи\n"
+        "• Коллекционные артефакты\n\n"
         "А пока что посети наш сайт для предзаказа\\!\n\n"
-        "🌐 underpeople\\.club/shop"
+        f"🌐 {WEBSITE_URL}"
     )
     
-    await query.edit_message_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        reply_markup=kb.back_button("shop"),
-        parse_mode="MarkdownV2"
+        reply_markup=kb.back_button("shop")
     )
 
 
