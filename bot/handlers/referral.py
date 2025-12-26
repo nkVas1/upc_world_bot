@@ -9,6 +9,7 @@ from bot.services.qr_generator import QRCodeGenerator
 from bot.database.repositories.user_repository import UserRepository
 from bot.utils.decorators import handle_errors
 from bot.utils.formatters import fmt
+from bot.utils.navigation import NavigationManager
 from bot.config import settings
 from bot.utils.logger import logger
 from bot.middlewares.auth import auth_middleware
@@ -20,17 +21,14 @@ from bot.middlewares.logging import logging_middleware
 @handle_errors
 async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show referral program main menu."""
-    query = update.callback_query
-    await query.answer()
-    
     async with db_manager.session() as session:
         user_repo = UserRepository(session)
-        user = await user_repo.get_by_id(query.from_user.id)
+        user = await user_repo.get_by_id(update.callback_query.from_user.id)
         
         referral_link = f"https://t.me/{settings.bot_username}?start={user.referral_code}"
         
         text = (
-            "🔗 *Реферальная программа*\n\n"
+            "🔗 *СВЯЗЬ \\- РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
             "Приглашай друзей и получай бонусы\\!\n\n"
             f"👥 Приглашено: *{user.referral_count}*\n"
             f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}\n\n"
@@ -39,10 +37,11 @@ async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "_Нажми на код или ссылку чтобы скопировать\\!_"
         )
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.referral_menu(user.referral_code),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.referral_menu(user.referral_code)
         )
 
 

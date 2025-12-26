@@ -14,6 +14,7 @@ from bot.database.repositories.transaction_repository import TransactionReposito
 from bot.utils.decorators import handle_errors
 from bot.utils.formatters import fmt
 from bot.utils.logger import logger
+from bot.utils.navigation import NavigationManager
 from bot.middlewares.auth import auth_middleware
 from bot.middlewares.logging import logging_middleware
 
@@ -23,36 +24,37 @@ from bot.middlewares.logging import logging_middleware
 @handle_errors
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show user profile."""
-    query = update.callback_query
-    await query.answer()
-    
     async with db_manager.session() as session:
         user_service = UserService(session)
-        profile = await user_service.get_user_profile(query.from_user.id)
+        profile = await user_service.get_user_profile(update.callback_query.from_user.id)
         
         if not profile:
-            await query.edit_message_text("❌ Профиль не найден")
+            text = "❌ Профиль не найден"
+            await NavigationManager.send_or_edit(
+                update,
+                context,
+                text,
+                reply_markup=None
+            )
             return
         
         text = fmt.format_user_profile(profile)
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.profile_menu(query.from_user.id),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.profile_menu(update.callback_query.from_user.id)
         )
 
 
 @handle_errors
 async def transactions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show transaction history."""
-    query = update.callback_query
-    await query.answer()
-    
     async with db_manager.session() as session:
         transaction_repo = TransactionRepository(session)
         transactions = await transaction_repo.get_user_transactions(
-            query.from_user.id,
+            update.callback_query.from_user.id,
             limit=10
         )
         

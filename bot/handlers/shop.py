@@ -56,14 +56,15 @@ async def shop_tickets_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         if not events:
             text = (
-                "📅 *Билеты на события*\n\n"
+                "🎟️ *АРСЕНАЛ \\- БИЛЕТЫ*\n\n"
                 "В данный момент нет запланированных событий\\.\n"
                 "Следите за новостями в нашем Telegram канале\\!"
             )
-            await query.edit_message_text(
+            await NavigationManager.send_or_edit(
+                update,
+                context,
                 text,
-                reply_markup=kb.back_button("shop"),
-                parse_mode="MarkdownV2"
+                reply_markup=kb.back_button("shop")
             )
             return
         
@@ -89,10 +90,11 @@ async def shop_tickets_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "_Выберите тип билета:_"
         )
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.ticket_types(),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.ticket_types()
         )
 
 
