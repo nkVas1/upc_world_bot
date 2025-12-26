@@ -148,14 +148,14 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         member_days = (datetime.utcnow() - user.created_at).days if user.created_at else 0
         
         text = (
-            "📊 *СТАТИСТИКА*\n\n"
+            f"📊 *СТАТИСТИКА*\n\n"
             f"📅 Дней в клубе: {member_days}\n"
             f"🎉 События посещено: {user.total_events_attended}\n"
             f"🔥 Текущий streak: {user.daily_streak} дней\n"
             f"🔗 Приглашено друзей: {user.referral_count}\n\n"
-            f"💰 Всего заработано: {fmt.format_coins(total_earned)}\n"
-            f"💸 Всего потрачено: {fmt.format_coins(total_spent)}\n"
-            f"💵 Текущий баланс: {fmt.format_coins(user.up_coins)}\n"
+            f"💰 Всего заработано: {fmt.escape_markdown(str(fmt.format_coins(total_earned)))}\n"
+            f"💸 Всего потрачено: {fmt.escape_markdown(str(fmt.format_coins(total_spent)))}\n"
+            f"💵 Текущий баланс: {fmt.escape_markdown(str(fmt.format_coins(user.up_coins)))}\n"
         )
         
         await NavigationManager.send_or_edit(
@@ -252,17 +252,9 @@ async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             if success:
                 user = await user_repo.get_by_id(update.effective_user.id)
-                text = (
-                    f"🎁 *Ежедневный бонус получен\\!*\n\n"
-                    f"\\+ {fmt.format_coins(bonus)}\n"
-                    f"🔥 Streak: {user.daily_streak} дней\n\n"
-                    f"_Приходи завтра за новым бонусом\\!_"
-                )
+                text = fmt.format_daily_bonus(bonus, user.daily_streak)
             else:
-                text = (
-                    "⏱ *Бонус уже получен\\!*\n\n"
-                    "Возвращайся через 24 часа за новым бонусом\\."
-                )
+                text = fmt.format_daily_bonus_already_claimed()
             
             # Send as navigation message instead of simple reply
             await NavigationManager.send_or_edit(

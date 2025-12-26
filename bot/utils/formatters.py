@@ -50,34 +50,6 @@ class TextFormatter:
             return "только что"
     
     @staticmethod
-    def format_user_profile(profile: dict) -> str:
-        """Format user profile message."""
-        membership_emoji = {
-            "guest": "👤",
-            "member": "⭐",
-            "vip": "👑"
-        }
-        
-        emoji = membership_emoji.get(profile["membership_level"], "👤")
-        
-        text = (
-            f"{emoji} *Профиль*\n\n"
-            f"👤 Имя: {TextFormatter.escape_markdown(profile['full_name'])}\n"
-            f"🎭 Статус: {TextFormatter.escape_markdown(profile['membership_level'].upper())}\n"
-            f"💰 UP Coins: {TextFormatter.format_coins(Decimal(profile['up_coins']))}\n"
-            f"🔥 Streak: {profile['daily_streak']} дней\n"
-            f"🎉 События посещено: {profile['total_events_attended']}\n"
-        )
-        
-        if profile.get("joined_at"):
-            text += f"📅 Участник с: {TextFormatter.format_date(datetime.fromisoformat(profile['joined_at']))}\n"
-        
-        if profile["referral"]["referral_count"] > 0:
-            text += f"\n🔗 Приглашено друзей: {profile['referral']['referral_count']}"
-        
-        return text
-    
-    @staticmethod
     def format_transaction(transaction: dict) -> str:
         """Format single transaction."""
         amount = Decimal(transaction["amount"])
@@ -100,12 +72,13 @@ class TextFormatter:
         streak = profile.get("daily_streak", 0)
         events = profile.get("total_events_attended", 0)
         referral_stats = profile.get("referral", {})
-        total_refs = referral_stats.get("total_referrals", 0)
-        ref_earnings = int(referral_stats.get("referral_earnings", 0))
+        total_refs = referral_stats.get("total_referrals", 0) if isinstance(referral_stats, dict) else 0
+        ref_earnings = int(referral_stats.get("referral_earnings", 0)) if isinstance(referral_stats, dict) else 0
+        
         return (
             f"👤 *{name}*\n"
             f"{username_escaped}\n\n"
-            f"🎖 Status: {membership}\n"
+            f"🎖 Status: {TextFormatter.escape_markdown(membership)}\n"
             f"💰 Balance: *{coins} UP Coins*\n"
             f"🔥 Daily Streak: *{streak} days*\n"
             f"🎉 Events Attended: *{events}*\n\n"

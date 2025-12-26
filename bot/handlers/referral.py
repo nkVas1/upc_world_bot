@@ -31,7 +31,7 @@ async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "🔗 *СВЯЗЬ \\— РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
             "Приглашай друзей и получай бонусы\\!\n\n"
             f"👥 Приглашено: *{user.referral_count}*\n"
-            f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}\n\n"
+            f"💰 Заработано: {fmt.escape_markdown(str(fmt.format_coins(user.referral_earnings)))}\n\n"
             f"🔑 Твой код: `{fmt.escape_markdown(user.referral_code)}`\n"
             f"🔗 Ссылка: `{fmt.escape_markdown(referral_link)}`\n\n"
             "_Нажми на код или ссылку чтобы скопировать\\!_"
@@ -59,7 +59,7 @@ async def referral_stats_callback(update: Update, context: ContextTypes.DEFAULT_
             text += "Поделитесь своей ссылкой с друзьями\\!"
         else:
             text += f"👥 Всего приглашено: *{stats['total_referrals']}*\n"
-            text += f"💰 Заработано: {fmt.format_coins(stats['referral_earnings'])}\n\n"
+            text += f"💰 Заработано: {fmt.escape_markdown(str(fmt.format_coins(stats['referral_earnings'])))}\n\n"
             
             benefits = stats["benefits"]
             if benefits["current_discount"] > 0:
@@ -201,7 +201,7 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 f"🔗 *СВЯЗЬ \\- РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
                 f"Приглашай друзей и получай бонусы\\!\n\n"
                 f"👥 Приглашено: *{user.referral_count}*\n"
-                f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}\n\n"
+                f"💰 Заработано: {fmt.escape_markdown(str(fmt.format_coins(user.referral_earnings)))}\n\n"
                 f"🔑 Твой код: `{fmt.escape_markdown(user.referral_code)}`\n"
                 f"🔗 Ссылка: `{fmt.escape_markdown(referral_link)}`\n\n"
                 f"_Нажми на код или ссылку чтобы скопировать\\!_"
