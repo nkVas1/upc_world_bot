@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings."""
+    """Application settings with Railway-compatible defaults."""
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -14,34 +14,66 @@ class Settings(BaseSettings):
         extra="ignore"
     )
     
-    # Bot
+    # ========== REQUIRED FIELDS ==========
+    # Bot - Must be provided
     bot_token: str = Field(..., alias="BOT_TOKEN")
     bot_username: str = Field(..., alias="BOT_USERNAME")
     
-    # Database
+    # Database - Must be provided
     database_url: str = Field(..., alias="DATABASE_URL")
     redis_url: str = Field(..., alias="REDIS_URL")
     
+    # ========== OPTIONAL FIELDS WITH DEFAULTS ==========
     # Website Integration
-    website_url: str = Field(..., alias="WEBSITE_URL")
-    website_api_key: str = Field(..., alias="WEBSITE_API_KEY")
-    website_webhook_secret: str = Field(..., alias="WEBSITE_WEBHOOK_SECRET")
+    website_url: str = Field(
+        default="https://under-people-club.vercel.app",
+        alias="WEBSITE_URL"
+    )
+    website_api_key: str = Field(
+        default="dev_api_key_change_in_production",
+        alias="WEBSITE_API_KEY"
+    )
+    website_webhook_secret: str = Field(
+        default="dev_webhook_secret_change_in_production",
+        alias="WEBSITE_WEBHOOK_SECRET"
+    )
     
     # Telegram Login Widget
-    telegram_bot_id: int = Field(..., alias="TELEGRAM_BOT_ID")
-    telegram_login_callback_url: str = Field(..., alias="TELEGRAM_LOGIN_CALLBACK_URL")
+    telegram_bot_id: int = Field(
+        default=8446133461,
+        alias="TELEGRAM_BOT_ID"
+    )
+    telegram_login_callback_url: str = Field(
+        default="https://underpeople.club/auth/telegram",
+        alias="TELEGRAM_LOGIN_CALLBACK_URL"
+    )
     
     # Security
-    secret_key: str = Field(..., alias="SECRET_KEY")
-    jwt_secret: str = Field(..., alias="JWT_SECRET")
-    encryption_key: str = Field(..., alias="ENCRYPTION_KEY")
+    secret_key: str = Field(
+        default="dev_secret_key_change_in_production_32chars",
+        alias="SECRET_KEY"
+    )
+    jwt_secret: str = Field(
+        default="dev_jwt_secret_change_in_production_key",
+        alias="JWT_SECRET"
+    )
+    encryption_key: str = Field(
+        default="12345678901234567890123456789012",  # Exactly 32 chars
+        alias="ENCRYPTION_KEY"
+    )
     
     # Admins
     admin_ids: List[int] = Field(default_factory=list, alias="ADMIN_IDS")
     
     # Payment
-    payment_provider_token: str = Field(..., alias="PAYMENT_PROVIDER_TOKEN")
-    payment_webhook_url: str = Field(..., alias="PAYMENT_WEBHOOK_URL")
+    payment_provider_token: str = Field(
+        default="dev_payment_token",
+        alias="PAYMENT_PROVIDER_TOKEN"
+    )
+    payment_webhook_url: str = Field(
+        default="https://example.com/payment-webhook",
+        alias="PAYMENT_WEBHOOK_URL"
+    )
     
     # Sentry
     sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
