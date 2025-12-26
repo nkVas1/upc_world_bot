@@ -88,6 +88,47 @@ class TextFormatter:
             f"{TextFormatter.escape_markdown(transaction['description'])}\n"
             f"_{TextFormatter.format_datetime_relative(datetime.fromisoformat(transaction['created_at']))}_"
         )
+    
+    @staticmethod
+    def format_user_profile(profile: dict) -> str:
+        """Format user profile with MarkdownV2 escaping."""
+        name = TextFormatter.escape_markdown(profile.get("full_name", "User"))
+        username = f"@{profile['username']}" if profile.get("username") else "No username"
+        username_escaped = TextFormatter.escape_markdown(username)
+        membership = "👑 VIP Member" if profile.get("membership_level") == "vip" else "🎭 Member" if profile.get("is_member") else "Guest"
+        coins = int(profile.get("up_coins", 0))
+        streak = profile.get("daily_streak", 0)
+        events = profile.get("total_events_attended", 0)
+        referral_stats = profile.get("referral", {})
+        total_refs = referral_stats.get("total_referrals", 0)
+        ref_earnings = int(referral_stats.get("referral_earnings", 0))
+        return (
+            f"👤 *{name}*\n"
+            f"{username_escaped}\n\n"
+            f"🎖 Status: {membership}\n"
+            f"💰 Balance: *{coins} UP Coins*\n"
+            f"🔥 Daily Streak: *{streak} days*\n"
+            f"🎉 Events Attended: *{events}*\n\n"
+            f"👥 Referrals: *{total_refs}* \\(\\+{ref_earnings} UP Coins\\)\n"
+        )
+    
+    @staticmethod
+    def format_daily_bonus(bonus: int, streak: int) -> str:
+        """Format daily bonus message."""
+        return (
+            f"🎁 *Daily Bonus Claimed\\!*\n\n"
+            f"\\+ *{int(bonus)} UP Coins*\n"
+            f"🔥 Streak: *{streak} days*\n\n"
+            f"_Come back tomorrow for more\\!_"
+        )
+    
+    @staticmethod
+    def format_daily_bonus_already_claimed() -> str:
+        """Format when bonus already claimed."""
+        return (
+            f"⏱ *Bonus Already Claimed\\!*\n\n"
+            f"Come back in 24 hours for your next bonus\\."
+        )
 
 
 fmt = TextFormatter

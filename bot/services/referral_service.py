@@ -164,14 +164,15 @@ class ReferralService:
         if not user:
             return {}
         
-        # Get referrals with their data
+        # CRITICAL FIX: Handle None referrals
         referral_details = []
-        for referral in user.referrals[:10]:  # Limit to recent 10
-            referral_details.append({
-                "name": referral.first_name or referral.username or "Anonymous",
-                "joined_at": referral.created_at.isoformat() if referral.created_at else None,
-                "is_member": referral.is_member
-            })
+        if user.referrals is not None:
+            for referral in user.referrals[:10]:  # Limit to recent 10
+                referral_details.append({
+                    "name": referral.first_name or referral.username or "Anonymous",
+                    "joined_at": referral.created_at.isoformat() if referral.created_at else None,
+                    "is_member": referral.is_member
+                })
         
         return {
             "total_referrals": user.referral_count,

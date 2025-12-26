@@ -18,13 +18,19 @@ class UserRepository:
         self.session = session
     
     async def get_by_id(self, user_id: int) -> Optional[User]:
-        """Get user by Telegram ID."""
+        """Get user by Telegram ID with referrals loaded."""
         result = await self.session.execute(
             select(User)
             .options(selectinload(User.referrals))
             .where(User.id == user_id)
         )
-        return result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
+        
+        # CRITICAL FIX: Ensure referrals is never None
+        if user and user.referrals is None:
+            user.referrals = []
+        
+        return user
     
     async def get_by_referral_code(self, code: str) -> Optional[User]:
         """Get user by referral code."""
