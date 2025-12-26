@@ -111,11 +111,14 @@ async def referral_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             "_Покажите этот QR\\-код друзьям для быстрой регистрации\\!_"
         )
         
+        # QR sends as photo, navigation stays intact
         await query.message.reply_photo(
             photo=qr_image,
             caption=caption,
             parse_mode="MarkdownV2"
         )
+        
+        logger.info("referral_qr_sent", user_id=query.from_user.id)
 
 
 @handle_errors
@@ -176,28 +179,35 @@ async def referral_rules_callback(update: Update, context: ContextTypes.DEFAULT_
 @logging_middleware
 @handle_errors
 async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /referral command."""
+    """Handle /referral command and referral button."""
     try:
+        # Delete user's command message for cleaner chat
+        await NavigationManager.delete_user_command(update)
+        
         async with db_manager.session() as session:
             user_repo = UserRepository(session)
             user = await user_repo.get_by_id(update.effective_user.id)
             
             if not user:
-                await update.message.reply_text(
-                    "Сначала используйте /start",
-                    parse_mode="MarkdownV2"
+                text = "❌ Сначала используйте /start"
+                await NavigationManager.send_or_edit(
+                    update,
+                    context,
+                    text,
+                    reply_markup=None
                 )
                 return
             
             referral_link = f"https://t.me/{settings.bot_username}?start={user.referral_code}"
             
             text = (
-                "🔗 *СВЯЗЬ \\- РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
-                "Приглашай друзей и получай бонусы\\!\n\n"
-                f"`{fmt.escape_markdown(referral_link)}`\n\n"
-                f"Код: `{fmt.escape_markdown(user.referral_code)}`\n\n"
-                f"👥 Приглашено: {user.referral_count}\n"
-                f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}"
+                f"🔗 *СВЯЗЬ \\- РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
+                f"Приглашай друзей и получай бонусы\\!\n\n"
+                f"👥 Приглашено: *{user.referral_count}*\n"
+                f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}\n\n"
+                f"🔑 Твой код: `{fmt.escape_markdown(user.referral_code)}`\n"
+                f"🔗 Ссылка: `{fmt.escape_markdown(referral_link)}`\n\n"
+                f"_Нажми на код или ссылку чтобы скопировать\\!_"
             )
             
             await NavigationManager.send_or_edit(
@@ -210,10 +220,11 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             logger.info("referral_command", user_id=update.effective_user.id)
     except Exception as e:
         logger.error("referral_command_error", error=str(e), user_id=update.effective_user.id)
-        await update.message.reply_text(
-            "😔 Произошла ошибка\\.\n"
-            "Попробуйте /start",
-            parse_mode="MarkdownV2"
+        await NavigationManager.send_or_edit(
+            update,
+            context,
+            "😔 Произошла ошибка\\.\nПопробуйте /start",
+            reply_markup=None
         )
 
 

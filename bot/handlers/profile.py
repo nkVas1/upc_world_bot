@@ -51,17 +51,19 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 @handle_errors
 async def transactions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show transaction history."""
+    query = update.callback_query
+    
     async with db_manager.session() as session:
         transaction_repo = TransactionRepository(session)
         transactions = await transaction_repo.get_user_transactions(
-            update.callback_query.from_user.id,
+            query.from_user.id,
             limit=10
         )
         
         if not transactions:
-            text = "📊 *История транзакций*\n\nУ вас пока нет транзакций\\."
+            text = "📊 *ИСТОРИЯ ТРАНЗАКЦИЙ*\n\nУ вас пока нет транзакций\\."
         else:
-            text = "📊 *История транзакций*\n\n"
+            text = "📊 *ИСТОРИЯ ТРАНЗАКЦИЙ*\n\n"
             text += "Последние 10 операций:\n\n"
             
             for trans in transactions:
@@ -72,10 +74,11 @@ async def transactions_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 }
                 text += fmt.format_transaction(trans_dict) + "\n"
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.back_button("profile"),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.back_button("profile")
         )
 
 
@@ -83,13 +86,12 @@ async def transactions_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show user achievements."""
     query = update.callback_query
-    await query.answer()
     
     async with db_manager.session() as session:
         user_repo = UserRepository(session)
         user = await user_repo.get_by_id(query.from_user.id)
         
-        text = "🎯 *Достижения*\n\n"
+        text = "🎯 *ДОСТИЖЕНИЯ*\n\n"
         
         if user.total_events_attended >= 1:
             text += "✅ Первая вечеринка\n"
@@ -113,10 +115,11 @@ async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         text += "\n_Продолжай участвовать в жизни клуба для новых достижений\\!_"
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.back_button("profile"),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.back_button("profile")
         )
 
 
@@ -124,7 +127,6 @@ async def achievements_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show user statistics."""
     query = update.callback_query
-    await query.answer()
     
     async with db_manager.session() as session:
         user_repo = UserRepository(session)
@@ -137,7 +139,7 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         member_days = (datetime.utcnow() - user.created_at).days if user.created_at else 0
         
         text = (
-            "📊 *Статистика*\n\n"
+            "📊 *СТАТИСТИКА*\n\n"
             f"📅 Дней в клубе: {member_days}\n"
             f"🎉 События посещено: {user.total_events_attended}\n"
             f"🔥 Текущий streak: {user.daily_streak} дней\n"
@@ -147,10 +149,11 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             f"💵 Текущий баланс: {fmt.format_coins(user.up_coins)}\n"
         )
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.back_button("profile"),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.back_button("profile")
         )
 
 
@@ -168,15 +171,20 @@ async def profile_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     caption = (
         "📱 *Ваш QR\\-код профиля*\n\n"
-        f"Ссылка: `https://underpeople\\.club/profile/{query.from_user.id}`\n\n"
+        f"Ссылка: `https://underpeople\\-club\\.vercel\\.app/profile/{query.from_user.id}`\n\n"
         "_Покажите этот код на входе для быстрой идентификации\\!_"
     )
     
+    # QR sends as photo, not text message
+    # So we send it separately and keep navigation intact
     await query.message.reply_photo(
         photo=qr_image,
         caption=caption,
         parse_mode="MarkdownV2"
     )
+    
+    # Don't change navigation message - user stays on current screen
+    logger.info("qr_code_sent", user_id=query.from_user.id)
 
 
 @handle_errors
@@ -194,17 +202,23 @@ async def sync_website_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         if success:
             text = (
-                "✅ *Синхронизация завершена\\!*\n\n"
+                "✅ *СИНХРОНИЗАЦИЯ ЗАВЕРШЕНА\\!*\n\n"
                 "Ваши данные успешно синхронизированы с сайтом\\.\n"
                 "Теперь вы можете войти на сайт через Telegram\\!"
             )
         else:
             text = (
-                "❌ *Ошибка синхронизации*\n\n"
+                "❌ *ОШИБКА СИНХРОНИЗАЦИИ*\n\n"
                 "Не удалось синхронизировать данные\\.\n"
                 "Попробуйте позже или обратитесь в поддержку\\."
             )
         
+        await NavigationManager.send_or_edit(
+            update,
+            context,
+            text,
+            reply_markup=kb.back_button("profile")
+        )
         await query.edit_message_text(
             text,
             reply_markup=kb.back_button("profile"),
@@ -218,6 +232,9 @@ async def sync_website_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Claim daily bonus."""
     try:
+        # Delete command for cleaner chat
+        await NavigationManager.delete_user_command(update)
+        
         async with db_manager.session() as session:
             user_repo = UserRepository(session)
             success, bonus = await user_repo.claim_daily_bonus(update.effective_user.id)
@@ -236,18 +253,23 @@ async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                     "Возвращайся через 24 часа за новым бонусом\\."
                 )
             
-            await update.message.reply_text(
+            # Send as navigation message instead of simple reply
+            await NavigationManager.send_or_edit(
+                update,
+                context,
                 text,
-                parse_mode="MarkdownV2"
+                reply_markup=None
             )
             
             logger.info("daily_bonus_command", user_id=update.effective_user.id, success=success)
     except Exception as e:
         logger.error("daily_bonus_error", error=str(e), user_id=update.effective_user.id)
-        await update.message.reply_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             "😔 Произошла ошибка при получении бонуса\\.\n"
             "Попробуйте позже\\.",
-            parse_mode="MarkdownV2"
+            reply_markup=None
         )
 
 
@@ -256,33 +278,42 @@ async def daily_bonus_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 @logging_middleware
 @handle_errors
 async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /profile command."""
+    """Handle /profile command and profile button."""
     try:
+        # Delete user's command message for cleaner chat
+        await NavigationManager.delete_user_command(update)
+        
         async with db_manager.session() as session:
             user_service = UserService(session)
             profile = await user_service.get_user_profile(update.effective_user.id)
             
             if not profile:
-                await update.message.reply_text(
-                    "❌ Профиль не найден",
-                    parse_mode="MarkdownV2"
+                text = "❌ Профиль не найден\\. Используйте /start"
+                await NavigationManager.send_or_edit(
+                    update,
+                    context,
+                    text,
+                    reply_markup=None
                 )
                 return
             
             text = fmt.format_user_profile(profile)
             
-            await update.message.reply_text(
+            await NavigationManager.send_or_edit(
+                update,
+                context,
                 text,
-                reply_markup=kb.profile_menu(update.effective_user.id),
-                parse_mode="MarkdownV2"
+                reply_markup=kb.profile_menu(update.effective_user.id)
             )
             
             logger.info("profile_command", user_id=update.effective_user.id)
     except Exception as e:
         logger.error("profile_command_error", error=str(e), user_id=update.effective_user.id)
-        await update.message.reply_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             "😔 Ошибка загрузки профиля\\.\nПопробуйте /start",
-            parse_mode="MarkdownV2"
+            reply_markup=None
         )
 
 

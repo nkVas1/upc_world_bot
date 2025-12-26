@@ -16,6 +16,9 @@ WEBSITE_URL = "https://under\\-people\\-club\\.vercel\\.app/"
 @handle_errors
 async def events_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle events button - Хроники событий."""
+    # Delete user's command for cleaner chat
+    await NavigationManager.delete_user_command(update)
+    
     text = (
         "📅 *ХРОНИКИ СОБЫТИЙ*\n\n"
         "🌑 *Under People Club* организует легендарные рейды в Москве\\!\n\n"
@@ -37,6 +40,9 @@ async def events_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 @handle_errors
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle help button - Система помощи."""
+    # Delete user's command for cleaner chat
+    await NavigationManager.delete_user_command(update)
+    
     text = (
         "❓ *СИСТЕМА ПОМОЩИ*\n\n"
         "*Основные команды:*\n"

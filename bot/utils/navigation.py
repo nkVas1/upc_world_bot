@@ -128,3 +128,65 @@ class NavigationManager:
         """Clear stored navigation message reference."""
         context.user_data.pop(NavigationManager.NAV_MESSAGE_KEY, None)
         context.user_data.pop(NavigationManager.NAV_CHAT_KEY, None)
+    
+    @staticmethod
+    async def delete_user_command(update: Update) -> None:
+        """Delete user's command message to keep chat clean.
+        
+        Args:
+            update: Update object with message to delete
+        """
+        if update.message:
+            try:
+                await update.message.delete()
+                logger.debug("user_command_deleted", msg_id=update.message.message_id)
+            except Exception as e:
+                logger.warning("failed_to_delete_command", error=str(e))
+    
+    @staticmethod
+    async def send_and_pin(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        text: str,
+        reply_markup=None,
+        parse_mode: str = "MarkdownV2"
+    ) -> Message:
+        """Send message and attempt to pin it (for channels/groups).
+        
+        For private chats, this just sends/edits the navigation message.
+        
+        Args:
+            update: Update object
+            context: Context object
+            text: Message text
+            reply_markup: Inline keyboard markup
+            parse_mode: Parse mode for text
+            
+        Returns:
+            Sent or edited Message object
+        """
+        # First, delete user's command to keep chat clean
+        await NavigationManager.delete_user_command(update)
+        
+        # Send or edit the navigation message
+        msg = await NavigationManager.send_or_edit(
+            update,
+            context,
+            text,
+            reply_markup,
+            parse_mode
+        )
+        
+        # Try to pin (works in groups/channels, silent fail in private)
+        try:
+            await context.bot.pin_chat_message(
+                chat_id=msg.chat_id,
+                message_id=msg.message_id,
+                disable_notification=True
+            )
+            logger.info("navigation_pinned", msg_id=msg.message_id)
+        except Exception as e:
+            # Expected to fail in private chats - that's OK
+            logger.debug("pin_not_available", error=str(e))
+        
+        return msg

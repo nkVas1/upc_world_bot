@@ -4,8 +4,9 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from bot.keyboards.inline import kb
-from bot.utils.formatters import fmt
 from bot.keyboards.reply import main_keyboard
+from bot.utils.formatters import fmt
+from bot.utils.navigation import NavigationManager
 from bot.database.session import db_manager
 from bot.services.user_service import UserService
 from bot.utils.decorators import handle_errors
@@ -22,6 +23,9 @@ from bot.middlewares.throttling import throttling_middleware
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
     user = update.effective_user
+    
+    # Delete user's command message for cleaner chat
+    await NavigationManager.delete_user_command(update)
     
     # Extract referral code from deep link
     referral_code = None
@@ -57,6 +61,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             f"Система готова к работе\\."
         )
     
+    # Use reply_text with main_keyboard since this is a Reply keyboard, not Inline
+    # NavigationManager is for inline messages
     await update.message.reply_text(
         welcome_text,
         reply_markup=main_keyboard(db_user.is_member),

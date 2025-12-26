@@ -122,8 +122,6 @@ async def ticket_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         discount = benefits["current_discount"]
         final_price = price * (1 - discount / 100)
         
-        await query.answer()
-        
         ticket_names = {
             "standard": "Standard",
             "freebar": "FreeBar",
@@ -154,10 +152,11 @@ async def ticket_type_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             "price": final_price
         }
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.payment_methods(final_price, "ticket", 1),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.payment_methods(final_price, "ticket", 1)
         )
 
 
@@ -186,11 +185,8 @@ async def shop_merch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 @handle_errors
 async def shop_special_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show special offers."""
-    query = update.callback_query
-    await query.answer()
-    
     text = (
-        "🎁 *Специальные предложения*\n\n"
+        "🎁 *СПЕЦИАЛЬНЫЕ ПРЕДЛОЖЕНИЯ*\n\n"
         "🔥 *Активные акции:*\n\n"
         "• При покупке 2\\-х билетов FreeBar \\- третий в подарок\\!\n"
         "• Скидка 50% на мерч при покупке VIP билета\n"
@@ -198,10 +194,11 @@ async def shop_special_callback(update: Update, context: ContextTypes.DEFAULT_TY
         "_Акции действуют до конца месяца\\!_"
     )
     
-    await query.edit_message_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        reply_markup=kb.back_button("shop"),
-        parse_mode="MarkdownV2"
+        reply_markup=kb.back_button("shop")
     )
 
 
@@ -209,7 +206,6 @@ async def shop_special_callback(update: Update, context: ContextTypes.DEFAULT_TY
 async def my_purchases_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show user's purchase history."""
     query = update.callback_query
-    await query.answer()
     
     async with db_manager.session() as session:
         sync_service = WebsiteSyncService(session)
@@ -217,12 +213,12 @@ async def my_purchases_callback(update: Update, context: ContextTypes.DEFAULT_TY
         
         if not tickets:
             text = (
-                "🎟️ *Мои покупки*\n\n"
+                "🎟️ *МОИ ПОКУПКИ*\n\n"
                 "У вас пока нет покупок\\.\n"
                 "Посетите магазин для приобретения билетов\\!"
             )
         else:
-            text = "🎟️ *Мои билеты*\n\n"
+            text = "🎟️ *МОИ БИЛЕТЫ*\n\n"
             
             for ticket in tickets[:5]:
                 status_emoji = "✅" if ticket["status"] == "active" else "❌"
@@ -232,10 +228,11 @@ async def my_purchases_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     f"Дата: {fmt.escape_markdown(ticket['event_date'])}\n\n"
                 )
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.back_button("shop"),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.back_button("shop")
         )
 
 
@@ -243,21 +240,19 @@ async def my_purchases_callback(update: Update, context: ContextTypes.DEFAULT_TY
 @handle_errors
 async def pay_card_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle card payment."""
-    query = update.callback_query
-    await query.answer()
-    
     text = (
-        "💳 *Оплата картой*\n\n"
+        "💳 *ОПЛАТА КАРТОЙ*\n\n"
         "Для завершения покупки перейдите на наш сайт:\n\n"
-        "🌐 underpeople\\.club/checkout\n\n"
+        f"🌐 {WEBSITE_URL}\n\n"
         "После оплаты билет автоматически появится в вашем профиле\\.\n\n"
         "_Или свяжитесь с администратором: @underpeople\\_admin_"
     )
     
-    await query.edit_message_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        reply_markup=kb.back_button("shop"),
-        parse_mode="MarkdownV2"
+        reply_markup=kb.back_button("shop")
     )
 
 
@@ -289,22 +284,22 @@ async def pay_coins_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Покупка билета {ticket_data['type']}"
         )
         
-        await query.answer("Покупка успешна!", show_alert=True)
+        await query.answer("✅ Покупка успешна!", show_alert=True)
         
         text = (
-            "✅ *Покупка завершена\\!*\n\n"
+            "✅ *ПОКУПКА ЗАВЕРШЕНА\\!*\n\n"
             f"Билет типа *{fmt.escape_markdown(ticket_data['type'])}* оформлен\\!\n\n"
             "Ваш билет будет доступен в разделе \"Мои покупки\"\n"
             "и автоматически синхронизирован с сайтом\\.\n\n"
             "_QR\\-код для входа будет доступен за день до события\\._"
         )
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.back_button("shop"),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.back_button("shop")
         )
-
 
 @auth_middleware
 @logging_middleware
@@ -312,6 +307,9 @@ async def pay_coins_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def shop_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle shop button from keyboard."""
     try:
+        # Delete user's command for cleaner chat
+        await NavigationManager.delete_user_command(update)
+        
         text = (
             "🏪 *СНАБЖЕНИЕ \\- МАГАЗИН*\n\n"
             "🌑 *Under People Club Store*\n\n"
@@ -322,18 +320,21 @@ async def shop_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "_Используй UP Coins для получения скидок\\!_"
         )
         
-        await update.message.reply_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.shop_menu(),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.shop_menu()
         )
         
         logger.info("shop_command", user_id=update.effective_user.id)
     except Exception as e:
         logger.error("shop_command_error", error=str(e), user_id=update.effective_user.id)
-        await update.message.reply_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             "😔 Ошибка загрузки магазина\\.\nПопробуйте позже\\.",
-            parse_mode="MarkdownV2"
+            reply_markup=None
         )
 
 
@@ -343,6 +344,9 @@ async def shop_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def tickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle tickets button from keyboard."""
     try:
+        # Delete user's command for cleaner chat
+        await NavigationManager.delete_user_command(update)
+        
         async with db_manager.session() as session:
             sync_service = WebsiteSyncService(session)
             events = await sync_service.get_upcoming_events(limit=1)
@@ -355,10 +359,11 @@ async def tickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     "📱 https://t\\.me/underpeople\\_club\n"
                     "🌐 https://under\\-people\\-club\\.vercel\\.app/"
                 )
-                await update.message.reply_text(
+                await NavigationManager.send_or_edit(
+                    update,
+                    context,
                     text,
-                    parse_mode="MarkdownV2",
-                    disable_web_page_preview=False
+                    reply_markup=None
                 )
                 return
             
@@ -377,18 +382,21 @@ async def tickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 "_Выберите тип билета:_"
             )
             
-            await update.message.reply_text(
+            await NavigationManager.send_or_edit(
+                update,
+                context,
                 text,
-                reply_markup=kb.ticket_types(),
-                parse_mode="MarkdownV2"
+                reply_markup=kb.ticket_types()
             )
             
             logger.info("tickets_command", user_id=update.effective_user.id)
     except Exception as e:
         logger.error("tickets_command_error", error=str(e), user_id=update.effective_user.id)
-        await update.message.reply_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             "😔 Ошибка загрузки билетов\\.\nПопробуйте позже\\.",
-            parse_mode="MarkdownV2"
+            reply_markup=None
         )
 
 
