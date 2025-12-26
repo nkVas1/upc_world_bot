@@ -5,9 +5,9 @@ from telegram.ext import ContextTypes, MessageHandler, filters, CommandHandler
 from bot.utils.decorators import handle_errors, logging_middleware
 from bot.utils.logger import logger
 
-# Brand constants
-TELEGRAM_CHANNEL = "https://t.me/underpeople_club"
-WEBSITE_URL = "https://under-people-club.vercel.app/"
+# Brand constants - properly escaped for MarkdownV2
+TELEGRAM_CHANNEL = "https://t\\.me/underpeople\\_club"
+WEBSITE_URL = "https://under\\-people\\-club\\.vercel\\.app/"
 
 
 @logging_middleware

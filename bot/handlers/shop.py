@@ -1,7 +1,7 @@
 """Shop and tickets handlers."""
 from decimal import Decimal
 from telegram import Update
-from telegram.ext import ContextTypes, CallbackQueryHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, CommandHandler
 
 from bot.keyboards.inline import kb
 from bot.database.session import db_manager
@@ -303,9 +303,104 @@ async def pay_coins_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
 
+@auth_middleware
+@logging_middleware
+@handle_errors
+async def shop_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle shop button from keyboard."""
+    try:
+        text = (
+            "🏪 *СНАБЖЕНИЕ \\- МАГАЗИН*\n\n"
+            "🌑 *Under People Club Store*\n\n"
+            "Доступные разделы:\n"
+            "• 🎟️ Билеты на события\n"
+            "• 👕 Эксклюзивный мерч\n"
+            "• 🎁 Специальные предложения\n\n"
+            "_Используй UP Coins для получения скидок\\!_"
+        )
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=kb.shop_menu(),
+            parse_mode="MarkdownV2"
+        )
+        
+        logger.info("shop_command", user_id=update.effective_user.id)
+    except Exception as e:
+        logger.error("shop_command_error", error=str(e), user_id=update.effective_user.id)
+        await update.message.reply_text(
+            "😔 Ошибка загрузки магазина\\.\nПопробуйте позже\\.",
+            parse_mode="MarkdownV2"
+        )
+
+
+@auth_middleware
+@logging_middleware
+@handle_errors
+async def tickets_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle tickets button from keyboard."""
+    try:
+        async with db_manager.session() as session:
+            sync_service = WebsiteSyncService(session)
+            events = await sync_service.get_upcoming_events(limit=1)
+            
+            if not events:
+                text = (
+                    "🎟️ *АРСЕНАЛ \\- БИЛЕТЫ*\n\n"
+                    "В данный момент нет запланированных событий\\.\n\n"
+                    "Следите за анонсами:\n"
+                    "📱 https://t\\.me/underpeople\\_club\n"
+                    "🌐 https://under\\-people\\-club\\.vercel\\.app/"
+                )
+                await update.message.reply_text(
+                    text,
+                    parse_mode="MarkdownV2",
+                    disable_web_page_preview=False
+                )
+                return
+            
+            event = events[0]
+            event_date = fmt.escape_markdown(event.get("event_date", "TBA"))
+            
+            text = (
+                f"🎟️ *АРСЕНАЛ \\- БИЛЕТЫ*\n\n"
+                f"*Ближайшее событие:*\n"
+                f"📅 {fmt.escape_markdown(event['title'])}\n"
+                f"📍 {event_date}\n\n"
+                "*Типы билетов:*\n\n"
+                "🎫 Standard \\- 500₽\n"
+                "🍾 FreeBar \\- 1500₽\n"
+                "⭐ VIP \\- 3000₽\n\n"
+                "_Выберите тип билета:_"
+            )
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=kb.ticket_types(),
+                parse_mode="MarkdownV2"
+            )
+            
+            logger.info("tickets_command", user_id=update.effective_user.id)
+    except Exception as e:
+        logger.error("tickets_command_error", error=str(e), user_id=update.effective_user.id)
+        await update.message.reply_text(
+            "😔 Ошибка загрузки билетов\\.\nПопробуйте позже\\.",
+            parse_mode="MarkdownV2"
+        )
+
+
 # Register handlers
 def register_shop_handlers(application):
     """Register shop-related handlers."""
+    # Keyboard button handlers
+    application.add_handler(MessageHandler(
+        filters.Regex(r"^🏪 Магазин$"), shop_command
+    ))
+    application.add_handler(MessageHandler(
+        filters.Regex(r"^🎟️ Билеты$"), tickets_command
+    ))
+    
+    # Callback query handlers
     application.add_handler(CallbackQueryHandler(shop_callback, pattern="^shop$"))
     application.add_handler(CallbackQueryHandler(shop_tickets_callback, pattern="^shop_tickets$"))
     application.add_handler(CallbackQueryHandler(ticket_type_callback, pattern="^ticket_"))
@@ -314,3 +409,5 @@ def register_shop_handlers(application):
     application.add_handler(CallbackQueryHandler(my_purchases_callback, pattern="^my_purchases$"))
     application.add_handler(CallbackQueryHandler(pay_card_callback, pattern="^pay_card_"))
     application.add_handler(CallbackQueryHandler(pay_coins_callback, pattern="^pay_coins_"))
+    
+    logger.info("shop_handlers_registered", count=10)

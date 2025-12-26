@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from bot.keyboards.inline import kb
+from bot.utils.formatters import fmt
 from bot.keyboards.reply import main_keyboard
 from bot.database.session import db_manager
 from bot.services.user_service import UserService
@@ -37,14 +38,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if is_new:
         welcome_text = (
             "🌑 *ДОБРО ПОЖАЛОВАТЬ В UNDER PEOPLE CLUB*\n\n"
-            "Ты вошёл в систему\\. Терминал активирован\\.\n\n"
+            "Терминал активирован\\. Система загружена\\.\n\n"
             "🎯 *Доступные модули:*\n"
-            "• 👤 Убежище \\- твой профиль и статус\n"
-            "• 🎟️ Арсенал \\- билеты на события\n"
+            "• 👤 Убежище \\- твой профиль\n"
+            "• 🎟️ Арсенал \\- билеты на рейды\n"
             "• 🏪 Снабжение \\- мерч и артефакты\n"
             "• 🔗 Связь \\- реферальная сеть\n"
             "• 📅 Хроники \\- архив событий\n\n"
-            "💰 Начальный ресурс: *100 UP Coins*\n\n"
+            "💰 *Стартовый капитал:* 100 UP Coins\n\n"
             "Используй меню для навигации\\.\n\n"
             "📱 Канал: https://t\\.me/underpeople\\_club\n"
             "🌐 База: https://under\\-people\\-club\\.vercel\\.app/"
@@ -52,7 +53,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     else:
         welcome_text = (
             f"🌑 *Терминал активирован*\n\n"
-            f"С возвращением, *{user.first_name}*\\!\n\n"
+            f"С возвращением, *{fmt.escape_markdown(user.first_name)}*\\!\n\n"
             f"Система готова к работе\\."
         )
     
