@@ -28,7 +28,7 @@ async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         referral_link = f"https://t.me/{settings.bot_username}?start={user.referral_code}"
         
         text = (
-            "🔗 *СВЯЗЬ \\- РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
+            "🔗 *СВЯЗЬ \\— РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
             "Приглашай друзей и получай бонусы\\!\n\n"
             f"👥 Приглашено: *{user.referral_count}*\n"
             f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}\n\n"
@@ -161,7 +161,7 @@ async def referral_rules_callback(update: Update, context: ContextTypes.DEFAULT_
         "• Нельзя использовать свой собственный код\n"
         "• Бонусы начисляются автоматически\n"
         "• Скидки применяются при покупке билетов\n\n"
-        "_Чем больше друзей \\- тем больше бонусов\\!_"
+        "_Чем больше друзей \\— тем больше бонусов\\!_"
     )
     
     await NavigationManager.send_or_edit(

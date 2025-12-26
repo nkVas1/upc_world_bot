@@ -26,9 +26,9 @@ class UserRepository:
         )
         user = result.scalar_one_or_none()
         
-        # CRITICAL FIX: Ensure referrals is never None
-        if user and user.referrals is None:
-            user.referrals = []
+        # CRITICAL FIX: SQLAlchemy relationship already initializes referrals as list
+        # Do NOT reassign - it causes AttributeError
+        # Just return user as-is, referrals will be [] if empty
         
         return user
     
