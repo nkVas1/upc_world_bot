@@ -1,6 +1,6 @@
 """Referral system handlers."""
 from telegram import Update
-from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from bot.keyboards.inline import kb
 from bot.database.session import db_manager
@@ -223,9 +223,17 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 # Register handlers
 def register_referral_handlers(application):
     """Register referral-related handlers."""
+    # Command handler
+    application.add_handler(CommandHandler("referral", referral_command))
+    
+    # Button handler from keyboard
+    application.add_handler(MessageHandler(
+        filters.Regex(r"^🔗 Рефералы$"), referral_command
+    ))
+    
+    # Callback handlers
     application.add_handler(CallbackQueryHandler(referral_callback, pattern="^referral$"))
     application.add_handler(CallbackQueryHandler(referral_stats_callback, pattern="^referral_stats$"))
     application.add_handler(CallbackQueryHandler(referral_qr_callback, pattern="^referral_qr$"))
     application.add_handler(CallbackQueryHandler(referral_rewards_callback, pattern="^referral_rewards$"))
     application.add_handler(CallbackQueryHandler(referral_rules_callback, pattern="^referral_rules$"))
-    application.add_handler(CommandHandler("referral", referral_command))

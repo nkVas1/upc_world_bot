@@ -2,7 +2,7 @@
 from datetime import datetime
 from decimal import Decimal
 from telegram import Update
-from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler
+from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from bot.keyboards.inline import kb
 from bot.database.session import db_manager
@@ -286,7 +286,15 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 def register_profile_handlers(application):
     """Register profile-related handlers."""
+    # Command handler
     application.add_handler(CommandHandler("profile", profile_command))
+    
+    # Button handler from keyboard
+    application.add_handler(MessageHandler(
+        filters.Regex(r"^👤 Профиль$"), profile_command
+    ))
+    
+    # Callback handlers
     application.add_handler(CallbackQueryHandler(profile_callback, pattern="^profile$"))
     application.add_handler(CallbackQueryHandler(transactions_callback, pattern="^transactions$"))
     application.add_handler(CallbackQueryHandler(achievements_callback, pattern="^achievements$"))
