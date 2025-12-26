@@ -19,8 +19,10 @@ class QRCodeGenerator:
         user_id: int,
         username: Optional[str] = None
     ) -> BytesIO:
-        """Generate QR code linking to user's public profile."""
-        profile_url = f"{self.base_url}/profile/{user_id}"
+        """Generate QR code linking to user's public profile on website."""
+        # Format: /u/UP-{user_id} - matches website routing
+        profile_path = f"u/UP-{user_id}"
+        profile_url = f"{self.base_url}/{profile_path}"
         
         qr = qrcode.QRCode(
             version=1,
@@ -38,7 +40,7 @@ class QRCodeGenerator:
         img.save(buffer, format='PNG')
         buffer.seek(0)
         
-        logger.info("qr_generated", user_id=user_id, type="profile")
+        logger.info("qr_generated", user_id=user_id, type="profile", url=profile_url)
         return buffer
     
     def generate_ticket_qr(
@@ -70,7 +72,9 @@ class QRCodeGenerator:
     
     def generate_referral_qr(self, referral_code: str) -> BytesIO:
         """Generate QR code for referral link."""
-        referral_url = f"{self.base_url}/join?ref={referral_code}"
+        # Format: /join?ref={code} - matches website routing for referrals
+        referral_path = f"join?ref={referral_code}"
+        referral_url = f"{self.base_url}/{referral_path}"
         
         qr = qrcode.QRCode(
             version=1,
@@ -87,5 +91,5 @@ class QRCodeGenerator:
         img.save(buffer, format='PNG')
         buffer.seek(0)
         
-        logger.info("qr_generated", referral_code=referral_code, type="referral")
+        logger.info("qr_generated", referral_code=referral_code, type="referral", url=referral_url)
         return buffer

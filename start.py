@@ -166,11 +166,13 @@ def start_bot():
             
             # Print startup info
             print()
-            print_info("bot", "🤖 Telegram Bot работает")
+            print_info("bot", "🤖 Telegram Bot работает на polling")
             print_info("bot", "   Отправьте /start в боте для начала")
+            print_info("api", "🌐 Backend API запущен на http://0.0.0.0:8000")
+            print_info("api", "   Документация: http://0.0.0.0:8000/docs")
             print()
             print_info("info", "=" * 60)
-            print_warning("Нажмите Ctrl+C для остановки бота")
+            print_warning("Нажмите Ctrl+C для остановки всех сервисов")
             print_info("info", "=" * 60)
             print()
             

@@ -1,13 +1,13 @@
 """Inline keyboards for bot interactions."""
 from typing import Optional, List
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 
 class InlineKeyboards:
     """Factory for inline keyboards."""
     
     @staticmethod
-    def main_menu(is_member: bool = False) -> InlineKeyboardMarkup:
+    def main_menu(is_member: bool = False, website_url: str = "https://under-people-club.vercel.app") -> InlineKeyboardMarkup:
         """Main menu keyboard."""
         keyboard = [
             [
@@ -31,6 +31,14 @@ class InlineKeyboards:
                 InlineKeyboardButton("⭐ VIP Привилегии", callback_data="vip_perks")
             ])
         
+        # Add WebApp button to open website
+        keyboard.append([
+            InlineKeyboardButton(
+                "📱 Открыть в браузере",
+                web_app=WebAppInfo(url=website_url)
+            )
+        ])
+        
         keyboard.append([
             InlineKeyboardButton("ℹ️ О клубе", callback_data="about"),
             InlineKeyboardButton("❓ Помощь", callback_data="help"),
@@ -39,7 +47,7 @@ class InlineKeyboards:
         return InlineKeyboardMarkup(keyboard)
     
     @staticmethod
-    def profile_menu(user_id: int) -> InlineKeyboardMarkup:
+    def profile_menu(user_id: int, website_url: str = "https://under-people-club.vercel.app") -> InlineKeyboardMarkup:
         """Profile menu keyboard."""
         keyboard = [
             [
@@ -53,7 +61,10 @@ class InlineKeyboards:
                 InlineKeyboardButton("📱 QR-код профиля", callback_data="profile_qr"),
             ],
             [
-                InlineKeyboardButton("🔄 Синхронизация с сайтом", callback_data="sync_website"),
+                InlineKeyboardButton(
+                    "🌐 Сайт (Веб)",
+                    web_app=WebAppInfo(url=f"{website_url}/u/UP-{user_id}")
+                )
             ],
             [
                 InlineKeyboardButton("« Назад", callback_data="back_to_main"),
