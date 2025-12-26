@@ -48,12 +48,9 @@ async def referral_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 @handle_errors
 async def referral_stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show detailed referral statistics."""
-    query = update.callback_query
-    await query.answer()
-    
     async with db_manager.session() as session:
         referral_service = ReferralService(session)
-        stats = await referral_service.get_referral_stats(query.from_user.id)
+        stats = await referral_service.get_referral_stats(update.callback_query.from_user.id)
         
         text = "📊 *Статистика рефералов*\n\n"
         
@@ -87,10 +84,11 @@ async def referral_stats_callback(update: Update, context: ContextTypes.DEFAULT_
                     member_badge = "⭐" if ref["is_member"] else ""
                     text += f"• {name} {member_badge}\n"
         
-        await query.edit_message_text(
+        await NavigationManager.send_or_edit(
+            update,
+            context,
             text,
-            reply_markup=kb.back_button("referral"),
-            parse_mode="MarkdownV2"
+            reply_markup=kb.back_button("referral")
         )
 
 
@@ -123,9 +121,6 @@ async def referral_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 @handle_errors
 async def referral_rewards_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Show referral rewards information."""
-    query = update.callback_query
-    await query.answer()
-    
     text = (
         "🎁 *Награды реферальной программы*\n\n"
         "*За 1 реферала:*\n"
@@ -142,10 +137,11 @@ async def referral_rewards_callback(update: Update, context: ContextTypes.DEFAUL
         "_Каждый приглашённый друг также получает \\+25 UP Coins\\!_"
     )
     
-    await query.edit_message_text(
+    await NavigationManager.send_or_edit(
+        update,
+        context,
         text,
-        reply_markup=kb.back_button("referral"),
-        parse_mode="MarkdownV2"
+        reply_markup=kb.back_button("referral")
     )
 
 
@@ -196,17 +192,19 @@ async def referral_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             referral_link = f"https://t.me/{settings.bot_username}?start={user.referral_code}"
             
             text = (
-                f"🔗 *Твоя реферальная ссылка:*\n\n"
+                "🔗 *СВЯЗЬ \\- РЕФЕРАЛЬНАЯ СЕТЬ*\n\n"
+                "Приглашай друзей и получай бонусы\\!\n\n"
                 f"`{fmt.escape_markdown(referral_link)}`\n\n"
                 f"Код: `{fmt.escape_markdown(user.referral_code)}`\n\n"
                 f"👥 Приглашено: {user.referral_count}\n"
                 f"💰 Заработано: {fmt.format_coins(user.referral_earnings)}"
             )
             
-            await update.message.reply_text(
+            await NavigationManager.send_or_edit(
+                update,
+                context,
                 text,
-                reply_markup=kb.referral_menu(user.referral_code),
-                parse_mode="MarkdownV2"
+                reply_markup=kb.referral_menu(user.referral_code)
             )
             
             logger.info("referral_command", user_id=update.effective_user.id)
