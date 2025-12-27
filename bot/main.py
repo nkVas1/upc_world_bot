@@ -43,19 +43,12 @@ async def error_handler(update: object, context) -> None:
 
 
 async def post_init(application: Application) -> None:
-    """Initialize database and resources after Application starts."""
+    """Initialize resources after Application starts."""
     try:
         logger.info("post_init_starting")
         
-        # Initialize database
-        await db_manager.initialize()
-        logger.info("database_initialized")
-        
-        # Create tables if they don't exist
-        async with db_manager.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        
-        logger.info("database_tables_created")
+        # ✅ Database is now initialized in launcher.py before starting services
+        # No need to initialize it here again
         
         # Set bot commands
         commands = [

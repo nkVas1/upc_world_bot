@@ -19,6 +19,36 @@ print(f"CWD: {os.getcwd()}")
 print()
 
 
+async def initialize_database():
+    """
+    Initialize database ONCE before starting both bot and API.
+    CRITICAL: Both bot and API need database access, so initialize FIRST.
+    """
+    try:
+        print("[DB] Initializing database...")
+        
+        from bot.database.session import db_manager
+        from bot.database.base import Base
+        from bot.utils.logger import logger
+        
+        # Initialize database manager (creates engine and session factory)
+        db_manager.init()
+        logger.info("database_manager_initialized")
+        
+        # Create tables if they don't exist
+        async with db_manager.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        logger.info("database_tables_created")
+        print("[DB] ✅ Database initialized successfully")
+        
+    except Exception as e:
+        print(f"[DB] ❌ Database initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
 async def start_bot():
     """Start Telegram bot in ASYNC polling mode."""
     try:
@@ -30,14 +60,13 @@ async def start_bot():
         
         logger.info("bot_task_starting")
         
-        # Create application
+        # Create application (without post_init database initialization)
         app = await create_application()
         
         print("[BOT] ✅ Application created successfully")
         print("[BOT] 🤖 Starting Telegram Bot polling...")
         
-        # Run polling ASYNC (NOT sync!)
-        # CRITICAL FIX: Use run_bot_async() instead of run_polling()
+        # Run polling ASYNC
         await run_bot_async(app)
         
     except asyncio.CancelledError:
@@ -100,6 +129,15 @@ async def main():
     try:
         print()
         print("=" * 70)
+        print("Initializing services...")
+        print("=" * 70)
+        print()
+        
+        # CRITICAL FIX: Initialize database FIRST before starting services
+        await initialize_database()
+        
+        print()
+        print("=" * 70)
         print("Starting services in parallel mode...")
         print("=" * 70)
         print()
@@ -133,6 +171,14 @@ async def main():
         sys.exit(1)
     finally:
         print("[MAIN] Shutting down...")
+        
+        # Cleanup database
+        try:
+            from bot.database.session import db_manager
+            await db_manager.dispose()
+            print("[DB] ✅ Database disposed")
+        except Exception as e:
+            print(f"[DB] ⚠️  Database cleanup error: {e}")
 
 
 if __name__ == "__main__":
