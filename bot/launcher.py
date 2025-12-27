@@ -1,6 +1,6 @@
 """
 Unified launcher for Bot + API (Railway Production)
-Runs Telegram bot polling and FastAPI server concurrently.
+Runs Telegram bot polling and FastAPI server concurrently in single event loop.
 """
 import asyncio
 import os
@@ -20,12 +20,12 @@ print()
 
 
 async def start_bot():
-    """Start Telegram bot in polling mode."""
+    """Start Telegram bot in ASYNC polling mode."""
     try:
         print("[BOT] Loading bot modules...")
         
         # Import AFTER sys.path is set
-        from bot.main import create_application, run_polling
+        from bot.main import create_application, run_bot_async
         from bot.utils.logger import logger
         
         logger.info("bot_task_starting")
@@ -36,9 +36,13 @@ async def start_bot():
         print("[BOT] ✅ Application created successfully")
         print("[BOT] 🤖 Starting Telegram Bot polling...")
         
-        # Run polling (blocks forever)
-        run_polling(app)
+        # Run polling ASYNC (NOT sync!)
+        # CRITICAL FIX: Use run_bot_async() instead of run_polling()
+        await run_bot_async(app)
         
+    except asyncio.CancelledError:
+        print("[BOT] ⚠️  Bot task cancelled")
+        raise
     except Exception as e:
         print(f"[BOT] ❌ Bot error: {e}")
         import traceback
@@ -61,15 +65,13 @@ async def start_api():
         port = int(os.getenv("PORT", "8000"))
         host = "0.0.0.0"  # Listen on all interfaces for Railway
         
-        # FIXED: Removed invalid shutdown_delay parameter
-        # Only use parameters that exist in uvicorn.Config
         config = uvicorn.Config(
-            app,  # Pass app object directly
+            app,
             host=host,
             port=port,
             log_level="info",
             access_log=True,
-            timeout_keep_alive=75,  # For Railway proxy timeout
+            timeout_keep_alive=75,
         )
         
         server = uvicorn.Server(config)
@@ -78,11 +80,14 @@ async def start_api():
         print(f"[API] 📚 Docs: http://localhost:{port}/docs")
         print(f"[API] ✅ Health: http://localhost:{port}/api/health")
         
-        logger.info("cors_configured")
+        logger.info("api_server_starting")
         
         # Start server (blocks forever)
         await server.serve()
         
+    except asyncio.CancelledError:
+        print("[API] ⚠️  API task cancelled")
+        raise
     except Exception as e:
         print(f"[API] ❌ API error: {e}")
         import traceback
@@ -91,7 +96,7 @@ async def start_api():
 
 
 async def main():
-    """Run bot and API concurrently."""
+    """Run bot and API concurrently in single event loop."""
     try:
         print()
         print("=" * 70)
@@ -99,40 +104,39 @@ async def main():
         print("=" * 70)
         print()
         
-        # Create tasks
-        bot_task = asyncio.create_task(start_bot(), name="bot")
-        api_task = asyncio.create_task(start_api(), name="api")
+        # Create tasks for both services
+        bot_task = asyncio.create_task(start_bot(), name="telegram_bot")
+        api_task = asyncio.create_task(start_api(), name="fastapi_server")
         
-        # Wait for both (they run forever)
-        done, pending = await asyncio.wait(
-            [bot_task, api_task],
-            return_when=asyncio.FIRST_EXCEPTION  # Stop if one fails
-        )
-        
-        # If we reach here, one task crashed
-        for task in done:
-            if task.exception():
-                print(f"❌ Task '{task.get_name()}' failed:")
-                print(f"   {task.exception()}")
-                
-        # Cancel remaining tasks
-        for task in pending:
-            task.cancel()
+        # Wait for both tasks to complete (they should run forever)
+        # If any task raises an exception, both will be cancelled
+        try:
+            await asyncio.gather(bot_task, api_task)
+        except Exception as e:
+            print(f"\n[MAIN] ❌ Exception in main loop: {e}")
             
-        sys.exit(1)
+            # Cancel both tasks
+            bot_task.cancel()
+            api_task.cancel()
+            
+            # Wait for cancellation
+            await asyncio.gather(bot_task, api_task, return_exceptions=True)
+            
+            raise
         
     except KeyboardInterrupt:
-        print("\n[MAIN] ⚠️  Interrupt received, shutting down...")
-        sys.exit(0)
+        print("\n[MAIN] ⚠️  Keyboard interrupt received")
     except Exception as e:
-        print(f"[MAIN] ❌ Fatal error: {e}")
+        print(f"\n[MAIN] ❌ Fatal error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
+    finally:
+        print("[MAIN] Shutting down...")
 
 
 if __name__ == "__main__":
-    # Signal handlers
+    # Setup signal handlers
     def handle_signal(sig, frame):
         print(f"\n[MAIN] Signal {sig} received, exiting...")
         sys.exit(0)
@@ -140,8 +144,13 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
     
-    # Run
+    # Run main async function
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n[MAIN] Stopped")
+        print("\n[MAIN] Stopped by user")
+    except SystemExit:
+        pass
+    except Exception as e:
+        print(f"\n[MAIN] Unexpected error: {e}")
+        sys.exit(1)

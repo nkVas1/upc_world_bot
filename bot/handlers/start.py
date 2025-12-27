@@ -114,33 +114,27 @@ async def close_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 @logging_middleware
 @handle_errors
 async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /login command - generates auth code and sends login link."""
-    user = update.effective_user
-    
-    # Delete user's command message for cleaner chat
-    await NavigationManager.delete_user_command(update)
-    
+    """
+    Generate one-time login link for website.
+    User clicks this in bot, gets link to website with auth code.
+    """
     try:
-        # Get user from database
-        async with db_manager.session() as session:
-            from bot.database.repositories.user_repository import UserRepository
-            user_repo = UserRepository(session)
-            db_user = await user_repo.get_by_id(user.id)
-            
-            if not db_user:
-                await update.message.reply_text(
-                    "❌ Пользователь не найден. Используйте /start для регистрации.",
-                    parse_mode="HTML"
-                )
-                logger.warning("login_user_not_found", user_id=user.id)
-                return
+        user = update.effective_user
         
-        # Generate auth code and store in TokenStorage (NOT in bot object)
+        # Delete user's command message for cleaner chat
+        await NavigationManager.delete_user_command(update)
+        
+        # Generate unique code
         code = str(uuid4())
-        TokenStorage.add_code(code, user.id)
         
-        # Create login URL that returns user to website with auth code
-        login_url = f"{settings.website_url}/auth/callback?code={code}"
+        # Store code in API server
+        # Import here to avoid circular import
+        from bot.api_server import store_auth_code
+        store_auth_code(code, user.id)
+        
+        # Generate login URL
+        website_url = settings.website_url or "https://under-people-club.vercel.app"
+        login_url = f"{website_url}/auth/callback?code={code}"
         
         # Create inline keyboard with login button
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -152,10 +146,10 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
         # Send message with login button
         await update.message.reply_text(
-            "🔐 <b>Вход в личный кабинет</b>\n\n"
+            "🔐 <b>Вход на сайт Under People Club</b>\n\n"
             "Нажмите кнопку ниже, чтобы перейти на сайт. "
             "Вы будете авторизованы автоматически.\n\n"
-            "<i>Ссылка действует 15 минут</i>",
+            "<i>Ссылка действует 5 минут</i>",
             reply_markup=keyboard,
             parse_mode="HTML"
         )
@@ -163,7 +157,7 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.info("login_command_executed", user_id=user.id, code=code[:8] + "...")
         
     except Exception as e:
-        logger.error("login_command_error", error=str(e), user_id=user.id)
+        logger.error("login_command_error", error=str(e), user_id=update.effective_user.id)
         await update.message.reply_text(
             "❌ Ошибка при генерации ссылки входа. Попробуйте позже.",
             parse_mode="HTML"
