@@ -127,10 +127,10 @@ async def login_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         # Generate unique code
         code = str(uuid4())
         
-        # Store code in API server
-        # Import here to avoid circular import
-        from bot.api_server import store_auth_code
-        store_auth_code(code, user.id)
+        # Store code (15 minute TTL)
+        # Import TokenStorage to store code
+        from bot.utils.token_storage import TokenStorage
+        TokenStorage.add_code(code, user.id)
         
         # Generate login URL
         website_url = settings.website_url or "https://under-people-club.vercel.app"

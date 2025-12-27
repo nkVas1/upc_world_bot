@@ -79,22 +79,8 @@ async def options_handler(path: str):
 
 
 # ========== AUTH CODE STORAGE ==========
-# In-memory storage for auth codes (one-time use, 5 minute TTL)
-# TODO: In production, use Redis with expiry
-AUTH_CODES = {}  # {code: (user_id, timestamp)}
-
-
-def store_auth_code(code: str, user_id: int, ttl: int = 300):
-    """
-    Store auth code for user (one-time use, TTL-based expiry).
-    
-    Args:
-        code: Generated UUID code
-        user_id: Telegram user ID
-        ttl: Time to live in seconds (default 5 minutes)
-    """
-    AUTH_CODES[code] = (user_id, time.time() + ttl)
-    logger.info("auth_code_stored", code=code[:8], user_id=user_id, ttl=ttl)
+# Using TokenStorage from bot/utils/token_storage.py
+# This ensures single source of truth for auth codes
 
 
 # ========== MODELS ==========
@@ -225,7 +211,7 @@ async def auth_callback(request: AuthCodeRequest):
     
     Flow:
     1. User clicks "Войти" in bot
-    2. Bot generates UUID code via store_auth_code()
+    2. Bot generates UUID code via TokenStorage.add_code()
     3. Bot sends deep link with ?code=xxx
     4. User clicks link → returns to website with code in URL
     5. Website calls this endpoint with code in body
@@ -236,27 +222,15 @@ async def auth_callback(request: AuthCodeRequest):
         
         code = request.code
         
-        # Get user_id from code storage
-        if code not in AUTH_CODES:
-            logger.warning("auth_code_invalid", code=code[:8])
+        # Get user_id from TokenStorage (validates expiry, one-time use, auto-deletes)
+        user_id = TokenStorage.get_user_id(code)
+        
+        if not user_id:
+            logger.warning("auth_code_invalid_or_expired", code=code[:8])
             raise HTTPException(
                 status_code=403,
                 detail="Invalid or expired authorization code"
             )
-        
-        user_id, expiry_time = AUTH_CODES[code]
-        
-        # Check if code expired
-        if time.time() > expiry_time:
-            del AUTH_CODES[code]
-            logger.warning("auth_code_expired", code=code[:8], user_id=user_id)
-            raise HTTPException(
-                status_code=403,
-                detail="Authorization code expired"
-            )
-        
-        # Delete code immediately (one-time use only!)
-        del AUTH_CODES[code]
         
         # Get user from database
         async with db_manager.session() as session:
