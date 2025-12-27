@@ -42,8 +42,9 @@ class UserService:
                 updates["last_name"] = telegram_user.last_name
             
             # Update photo if available
-            if telegram_user.photo_id and not user.photo_url:
-                updates["photo_url"] = f"tg://user/{telegram_user.id}"
+            # Note: Telegram API doesn't provide direct photo_id in User object
+            # Photo URL should come from WebApp or profile photo retrieval API
+            # Skipping photo update check to prevent AttributeError
             
             if updates:
                 user = await self.user_repo.update(telegram_user.id, **updates)
@@ -54,9 +55,9 @@ class UserService:
         ref_code = await self.referral_service.create_referral_code(telegram_user.id)
         
         # Get photo URL if available
+        # Note: Telegram API doesn't provide direct photo_id in User object
+        # Photo URL should come from WebApp or separate profile photo API call
         photo_url = None
-        if telegram_user.photo_id:
-            photo_url = f"tg://user/{telegram_user.id}"
         
         user = await self.user_repo.create({
             "id": telegram_user.id,

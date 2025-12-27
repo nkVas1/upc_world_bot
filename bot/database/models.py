@@ -23,6 +23,7 @@ class User(Base):
     first_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     last_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    photo_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Telegram photo file_id
     
     # Authentication & Sync
     telegram_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
