@@ -66,7 +66,6 @@ async def run_api():
             access_log=True,
             timeout_keep_alive=75,  # Keep-alive timeout for Railway proxy
             timeout_notify=30,       # Graceful shutdown timeout
-            shutdown_delay=5,        # Delay before shutdown
         )
         
         server = uvicorn.Server(config)
