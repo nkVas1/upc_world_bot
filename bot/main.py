@@ -139,18 +139,20 @@ async def create_application() -> Application:
 
 async def run_bot_async(application: Application) -> None:
     """
-    Run bot in polling mode ASYNCHRONOUSLY with retry mechanism.
+    Run bot in polling mode ASYNCHRONOUSLY with production-grade retry mechanism.
     This is the ASYNC version for use inside an existing event loop.
     CRITICAL: Does NOT create a new event loop.
     
-    Handles network errors and Telegram API failures with exponential backoff.
+    Implements infinite loop with exponential backoff for maximum reliability.
+    Never stops unless explicitly signaled (SIGINT/SIGTERM).
     """
-    max_retries = 5
-    retry_delay = 5
-    retry_count = 0
+    base_backoff = 5  # Start with 5 seconds
+    max_backoff = 300  # Cap at 5 minutes
+    consecutive_errors = 0
+    max_consecutive = 5  # Reset after success
     
     try:
-        logger.info("bot_starting", mode="async_polling")
+        logger.info("bot_starting", mode="async_polling_with_retry")
         
         # Initialize the application
         await application.initialize()
@@ -160,13 +162,13 @@ async def run_bot_async(application: Application) -> None:
         await application.start()
         logger.info("application_started")
         
-        while retry_count < max_retries:
+        # INFINITE LOOP: Production systems never exit polling
+        while True:
             try:
-                # Start polling with retry mechanism
                 logger.info(
-                    "polling_starting",
-                    attempt=retry_count + 1,
-                    max_retries=max_retries
+                    "polling_attempt",
+                    consecutive_errors=consecutive_errors,
+                    max_retries=max_consecutive
                 )
                 
                 await application.updater.start_polling(
@@ -181,10 +183,10 @@ async def run_bot_async(application: Application) -> None:
                 )
                 logger.info("polling_started_successfully")
                 
-                # Keep running (this blocks forever or until error)
+                # Keep running (this blocks forever or until signal)
                 print("[BOT] ✅ Telegram Bot is now polling for updates")
                 
-                # This is a blocking wait, but it's async-safe
+                # This is a blocking wait for graceful shutdown
                 stop_signals = (signal.SIGINT, signal.SIGTERM)
                 loop = asyncio.get_event_loop()
                 future = loop.create_future()
@@ -194,48 +196,74 @@ async def run_bot_async(application: Application) -> None:
                 
                 try:
                     await future
-                    break  # Graceful exit
+                    logger.info("polling_shutdown_signal_received")
+                    break  # Graceful shutdown
                 finally:
                     for sig in stop_signals:
                         loop.remove_signal_handler(sig)
                     
             except (NetworkError, TimedOut) as e:
-                retry_count += 1
-                logger.error(
+                consecutive_errors += 1
+                
+                # Calculate backoff with exponential growth
+                backoff = min(base_backoff * (2 ** (consecutive_errors - 1)), max_backoff)
+                
+                logger.warning(
                     "polling_network_error",
                     error=str(e),
-                    attempt=retry_count,
-                    max_retries=max_retries
+                    error_type=type(e).__name__,
+                    consecutive_errors=consecutive_errors,
+                    max_retries=max_consecutive,
+                    backoff_seconds=backoff
                 )
                 
-                if retry_count < max_retries:
-                    logger.info(
-                        "polling_retry_scheduled",
-                        retry_delay=retry_delay,
-                        next_retry=retry_count + 1
+                # Don't give up - just retry with backoff
+                if consecutive_errors >= max_consecutive:
+                    logger.warning(
+                        "polling_max_consecutive_errors",
+                        consecutive_errors=consecutive_errors,
+                        cooling_down_seconds=60
                     )
-                    await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, 300)  # Exponential backoff, max 5 minutes
-                else:
-                    logger.critical("polling_max_retries_exceeded")
-                    raise
+                    backoff = 60  # Cool down for 1 minute
+                
+                logger.info(
+                    "polling_retry_scheduled",
+                    retry_in=backoff,
+                    next_attempt=consecutive_errors + 1
+                )
+                await asyncio.sleep(backoff)
                     
             except TelegramError as e:
-                retry_count += 1
-                logger.error(
+                consecutive_errors += 1
+                backoff = min(base_backoff * (2 ** (consecutive_errors - 1)), max_backoff)
+                
+                logger.warning(
                     "polling_telegram_error",
                     error=str(e),
                     error_type=type(e).__name__,
-                    attempt=retry_count
+                    consecutive_errors=consecutive_errors,
+                    backoff_seconds=backoff
                 )
                 
-                if retry_count < max_retries:
-                    await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, 300)
-                else:
-                    logger.critical("polling_max_retries_exceeded_telegram")
-                    raise
+                await asyncio.sleep(backoff)
                     
+            except asyncio.CancelledError:
+                logger.info("polling_cancelled")
+                raise
+                
+            except Exception as e:
+                consecutive_errors += 1
+                logger.error(
+                    "polling_unexpected_error",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    consecutive_errors=consecutive_errors,
+                    exc_info=True
+                )
+                
+                # Use longer backoff for unexpected errors
+                await asyncio.sleep(60)
+        
     except asyncio.CancelledError:
         logger.info("bot_cancelled")
         raise
