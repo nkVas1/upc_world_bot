@@ -24,16 +24,24 @@ from bot.config import settings
 @throttling_middleware()
 @handle_errors
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command."""
+    """Handle /start command with optional deep link parameter."""
     user = update.effective_user
     
     # Delete user's command message for cleaner chat
     await NavigationManager.delete_user_command(update)
     
-    # Extract referral code from deep link
-    referral_code = None
+    # Extract parameter from deep link (e.g., /start login, /start ref_code)
+    param = None
     if context.args and len(context.args) > 0:
-        referral_code = context.args[0]
+        param = context.args[0]
+    
+    # If user clicked /start login deep link, redirect to login_command
+    if param == "login":
+        await login_command(update, context)
+        return
+    
+    # Otherwise treat as referral code
+    referral_code = param
     
     async with db_manager.session() as session:
         user_service = UserService(session)
