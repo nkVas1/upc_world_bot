@@ -29,17 +29,27 @@ app = FastAPI(
 )
 
 # Configure CORS - Allow requests from website and localhost
+# ⚠️ CRITICAL: CORS must allow frontend domain to make API requests
+cors_origins = [
+    "https://under-people-club.vercel.app",  # Production Vercel
+    "http://localhost:3000",                  # Local dev (Next.js default)
+    "http://localhost:3001",                  # Local dev alternative
+    "http://127.0.0.1:3000",                 # Loopback local dev
+]
+
+# If website_url is set in config and not already in list, add it
+if settings.website_url and settings.website_url not in cors_origins:
+    cors_origins.append(settings.website_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.website_url,
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Include PUT, DELETE for future
+    allow_headers=["*"],  # Allow all headers (Content-Type, Authorization, custom, etc.)
 )
+
+logger.info("cors_configured", origins=cors_origins)
 
 
 # ========== MODELS ==========
@@ -476,12 +486,47 @@ async def health_check():
 
 @app.options("/{full_path:path}")
 async def options_handler(full_path: str):
-    """Handle CORS preflight requests."""
+    """
+    Handle CORS preflight requests (OPTIONS method).
+    Browser sends OPTIONS before POST/PUT/DELETE for cross-domain requests.
+    """
     return JSONResponse(
         status_code=200,
         headers={
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "3600",  # Cache preflight for 1 hour
+        }
+    )
+
+
+# ========== ERROR HANDLERS ==========
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTP exceptions with CORS headers."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle unexpected exceptions with logging."""
+    logger.error(
+        "unhandled_exception",
+        error=str(exc),
+        error_type=type(exc).__name__,
+        path=request.url.path
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
         }
     )
