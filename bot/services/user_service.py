@@ -41,6 +41,11 @@ class UserService:
             if user.last_name != telegram_user.last_name:
                 updates["last_name"] = telegram_user.last_name
             
+            # КРИТИЧНО: Если нет referral_code - генерируем
+            if not user.referral_code:
+                user.referral_code = User.generate_referral_code()
+                logger.info("generated_referral_code_for_existing_user", user_id=user.id, code=user.referral_code)
+            
             # Update photo if available
             # Note: Telegram API doesn't provide direct photo_id in User object
             # Photo URL should come from WebApp or profile photo retrieval API
@@ -64,9 +69,11 @@ class UserService:
             "username": telegram_user.username,
             "first_name": telegram_user.first_name,
             "last_name": telegram_user.last_name,
-            "referral_code": ref_code,
+            "referral_code": ref_code,  # АВТОМАТИЧЕСКИ при создании
             "photo_url": photo_url,
         })
+        
+        logger.info("new_user_created", user_id=telegram_user.id, referral_code=ref_code)
         
         # Process referral if provided
         if referral_code:

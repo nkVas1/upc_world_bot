@@ -400,17 +400,36 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 )
                 return
             
+            # КРИТИЧНО: Используем referral_code как seed для аватара
+            referral_code = profile.get("referral_code", "user")
+            avatar_url = f"https://api.dicebear.com/9.x/avataaars/svg?seed={referral_code}"
+            
             text = fmt.format_user_profile(profile)
             
-            await NavigationManager.send_or_edit(
-                update,
-                context,
-                text,
-                reply_markup=kb.profile_menu(
-                    update.effective_user.id,
-                    referral_code=profile.get("referral_code")
+            # Отправляем аватар как фото
+            try:
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=avatar_url,
+                    caption=text,
+                    parse_mode="MarkdownV2",
+                    reply_markup=kb.profile_menu(
+                        update.effective_user.id,
+                        referral_code=referral_code
+                    )
                 )
-            )
+            except Exception as photo_error:
+                logger.error("profile_photo_send_error", error=str(photo_error))
+                # Fallback: отправляем текст без фото
+                await NavigationManager.send_or_edit(
+                    update,
+                    context,
+                    text,
+                    reply_markup=kb.profile_menu(
+                        update.effective_user.id,
+                        referral_code=referral_code
+                    )
+                )
             
             logger.info("profile_command", user_id=update.effective_user.id)
     except Exception as e:
