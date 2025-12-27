@@ -54,21 +54,26 @@ async def run_api():
     try:
         print("[API] Starting FastAPI server...")
         
-        # Get port from environment or use default
+        # Get port from environment (Railway sets $PORT dynamically)
         port = int(os.getenv("PORT", "8000"))
+        host = os.getenv("HOST", "0.0.0.0")
         
         config = uvicorn.Config(
             "bot.api_server:app",
-            host="0.0.0.0",
+            host=host,
             port=port,
             log_level="info",
             access_log=True,
+            timeout_keep_alive=75,  # Keep-alive timeout for Railway proxy
+            timeout_notify=30,       # Graceful shutdown timeout
+            shutdown_delay=5,        # Delay before shutdown
         )
         
         server = uvicorn.Server(config)
         
-        print(f"[API] 🌐 FastAPI server starting on http://0.0.0.0:{port}")
-        print(f"[API] 📚 API Documentation: http://0.0.0.0:{port}/docs")
+        print(f"[API] 🌐 FastAPI server starting on {host}:{port}")
+        print(f"[API] 📚 API Documentation: http://localhost:{port}/docs")
+        print(f"[API] ✅ Health check: http://localhost:{port}/api/health")
         
         await server.serve()
         

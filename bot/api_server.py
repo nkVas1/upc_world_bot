@@ -32,9 +32,11 @@ app = FastAPI(
 # ⚠️ CRITICAL: CORS must allow frontend domain to make API requests
 cors_origins = [
     "https://under-people-club.vercel.app",  # Production Vercel
+    "https://under-people-club.vercel.app/",  # With trailing slash
     "http://localhost:3000",                  # Local dev (Next.js default)
     "http://localhost:3001",                  # Local dev alternative
     "http://127.0.0.1:3000",                 # Loopback local dev
+    "https://*.vercel.app",                  # Vercel preview deployments
 ]
 
 # If website_url is set in config and not already in list, add it
@@ -45,8 +47,17 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Include PUT, DELETE for future
-    allow_headers=["*"],  # Allow all headers (Content-Type, Authorization, custom, etc.)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-CSRF-Token",
+    ],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight for 1 hour
 )
 
 logger.info("cors_configured", origins=cors_origins)

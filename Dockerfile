@@ -21,5 +21,8 @@ COPY . .
 RUN useradd -m -u 1000 botuser && chown -R botuser:botuser /app
 USER botuser
 
-# Run bot
-CMD ["python", "-m", "bot.main"]
+# Expose port for Railway
+EXPOSE 8000
+
+# Run bot + API via launcher
+CMD ["python", "-m", "bot.launcher"]
