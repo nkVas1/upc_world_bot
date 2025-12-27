@@ -124,6 +124,8 @@ class UserProfileResponse(BaseModel):
     total_events_attended: int
     referral_count: int
     referral_earnings: float
+    referral_code: Optional[str]
+    photo_url: Optional[str]
 
 
 # ========== AUTHENTICATION FUNCTIONS ==========
@@ -557,7 +559,9 @@ async def get_user_profile(authorization: str = None):
                 daily_streak=user.daily_streak,
                 total_events_attended=user.total_events_attended,
                 referral_count=user.referral_count,
-                referral_earnings=float(user.referral_earnings)
+                referral_earnings=float(user.referral_earnings),
+                referral_code=user.referral_code,
+                photo_url=user.photo_url
             )
         
     except HTTPException:

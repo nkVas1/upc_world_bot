@@ -47,8 +47,11 @@ class InlineKeyboards:
         return InlineKeyboardMarkup(keyboard)
     
     @staticmethod
-    def profile_menu(user_id: int, website_url: str = "https://under-people-club.vercel.app") -> InlineKeyboardMarkup:
+    def profile_menu(user_id: int, referral_code: str = None, website_url: str = "https://under-people-club.vercel.app") -> InlineKeyboardMarkup:
         """Profile menu keyboard."""
+        # Use referral_code if provided, otherwise fallback to UP-{user_id}
+        code = referral_code or f"UP-{user_id}"
+        
         keyboard = [
             [
                 InlineKeyboardButton("💰 История транзакций", callback_data="transactions"),
@@ -63,7 +66,7 @@ class InlineKeyboards:
             [
                 InlineKeyboardButton(
                     "🌐 Сайт (Веб)",
-                    web_app=WebAppInfo(url=f"{website_url}/u/UP-{user_id}")
+                    web_app=WebAppInfo(url=f"{website_url}/u/{code}")
                 )
             ],
             [

@@ -45,7 +45,10 @@ async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 update,
                 context,
                 text,
-                reply_markup=kb.profile_menu(update.callback_query.from_user.id)
+                reply_markup=kb.profile_menu(
+                    update.callback_query.from_user.id,
+                    referral_code=profile.get("referral_code")
+                )
             )
     except Exception as e:
         logger.error("profile_callback_error", error=str(e))
@@ -172,28 +175,42 @@ async def profile_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer("Генерируем QR-код...")
     
-    qr_generator = QRCodeGenerator()
-    qr_image = qr_generator.generate_user_profile_qr(
-        query.from_user.id,
-        query.from_user.username
-    )
-    
-    caption = (
-        "📱 *Ваш QR\\-код профиля*\n\n"
-        f"Ссылка: `https://underpeople\\-club\\.vercel\\.app/profile/{query.from_user.id}`\n\n"
-        "_Покажите этот код на входе для быстрой идентификации\\!_"
-    )
-    
-    # QR sends as photo, not text message
-    # So we send it separately and keep navigation intact
-    await query.message.reply_photo(
-        photo=qr_image,
-        caption=caption,
-        parse_mode="MarkdownV2"
-    )
-    
-    # Don't change navigation message - user stays on current screen
-    logger.info("qr_code_sent", user_id=query.from_user.id)
+    try:
+        async with db_manager.session() as session:
+            user_repo = UserRepository(session)
+            user = await user_repo.get_by_id(query.from_user.id)
+            
+            if not user:
+                await query.answer("❌ Профиль не найден", show_alert=True)
+                return
+            
+            referral_code = user.referral_code or f"UP-{user.id}"
+            
+            qr_generator = QRCodeGenerator()
+            qr_image = qr_generator.generate_user_profile_qr(
+                query.from_user.id,
+                query.from_user.username
+            )
+            
+            caption = (
+                "📱 *Ваш QR\\-код профиля*\n\n"
+                f"Ссылка: `https://under\\-people\\-club\\.vercel\\.app/u/{referral_code}`\n\n"
+                "_Покажите этот код на входе для быстрой идентификации\\!_"
+            )
+            
+            # QR sends as photo, not text message
+            # So we send it separately and keep navigation intact
+            await query.message.reply_photo(
+                photo=qr_image,
+                caption=caption,
+                parse_mode="MarkdownV2"
+            )
+            
+            # Don't change navigation message - user stays on current screen
+            logger.info("qr_code_sent", user_id=query.from_user.id)
+    except Exception as e:
+        logger.error("qr_code_error", error=str(e), user_id=query.from_user.id)
+        await query.answer("❌ Ошибка при генерации QR-кода", show_alert=True)
 
 
 @handle_errors
@@ -323,7 +340,10 @@ async def profile_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 update,
                 context,
                 text,
-                reply_markup=kb.profile_menu(update.effective_user.id)
+                reply_markup=kb.profile_menu(
+                    update.effective_user.id,
+                    referral_code=profile.get("referral_code")
+                )
             )
             
             logger.info("profile_command", user_id=update.effective_user.id)

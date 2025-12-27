@@ -36,7 +36,8 @@ class ReferralService:
         """Create unique referral code for user."""
         # Try up to 10 times to generate unique code
         for _ in range(10):
-            code = self.generate_referral_code()
+            generated_code = self.generate_referral_code()
+            code = f"UP-{generated_code}"
             existing = await self.user_repo.get_by_referral_code(code)
             if not existing:
                 await self.user_repo.update(user_id, referral_code=code)
@@ -44,7 +45,7 @@ class ReferralService:
                 return code
         
         # Fallback to user_id based code
-        code = f"UP{user_id}"
+        code = f"UP-{user_id}"
         await self.user_repo.update(user_id, referral_code=code)
         return code
     

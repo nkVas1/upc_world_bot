@@ -41,6 +41,10 @@ class UserService:
             if user.last_name != telegram_user.last_name:
                 updates["last_name"] = telegram_user.last_name
             
+            # Update photo if available
+            if telegram_user.photo_id and not user.photo_url:
+                updates["photo_url"] = f"tg://user/{telegram_user.id}"
+            
             if updates:
                 user = await self.user_repo.update(telegram_user.id, **updates)
             
@@ -49,12 +53,18 @@ class UserService:
         # Create new user
         ref_code = await self.referral_service.create_referral_code(telegram_user.id)
         
+        # Get photo URL if available
+        photo_url = None
+        if telegram_user.photo_id:
+            photo_url = f"tg://user/{telegram_user.id}"
+        
         user = await self.user_repo.create({
             "id": telegram_user.id,
             "username": telegram_user.username,
             "first_name": telegram_user.first_name,
             "last_name": telegram_user.last_name,
             "referral_code": ref_code,
+            "photo_url": photo_url,
         })
         
         # Process referral if provided
@@ -97,4 +107,5 @@ class UserService:
             "joined_at": user.created_at.isoformat() if user.created_at else None,
             "referral": referral_stats,
             "is_synced": user.is_synced,
+            "referral_code": user.referral_code,
         }
