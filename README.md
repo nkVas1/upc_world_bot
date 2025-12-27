@@ -287,9 +287,14 @@ tail -f logs/bot_*.log
 - ✅ QR code URL accuracy (/u/{referral_code})
 - ✅ WebApp button integration (dynamic referral_code)
 
-🟢 Все 8 проблем исправлены | 🚀 Ready for Railway deployment
+**Исправления PHASE 3 (Critical production bugs):**
+- ✅ 401 Unauthorized fix - Header extraction in /api/users/me (коммит 5da0158)
+- ✅ QR-codes/Access codes - UUID generation + TokenStorage (коммит 5da0158)
+- ✅ photo_id AttributeError - Removed direct photo_id access (коммит b4548b8)
 
-Подробнее: см. [SUMMARY_ALL_FIXES.md](../SUMMARY_ALL_FIXES.md)
+🟢 Все 11 проблем исправлены | 🚀 Production ready на Railway
+
+Подробнее: см. [docs/PHASE_3_CRITICAL_FIXES.md](docs/PHASE_3_CRITICAL_FIXES.md)
 
 ## Лицензия
 
