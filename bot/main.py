@@ -6,6 +6,7 @@ import asyncio
 import sys
 import signal
 from telegram import Update, BotCommand
+from telegram.error import TelegramError, NetworkError, TimedOut
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -138,10 +139,16 @@ async def create_application() -> Application:
 
 async def run_bot_async(application: Application) -> None:
     """
-    Run bot in polling mode ASYNCHRONOUSLY.
+    Run bot in polling mode ASYNCHRONOUSLY with retry mechanism.
     This is the ASYNC version for use inside an existing event loop.
     CRITICAL: Does NOT create a new event loop.
+    
+    Handles network errors and Telegram API failures with exponential backoff.
     """
+    max_retries = 5
+    retry_delay = 5
+    retry_count = 0
+    
     try:
         logger.info("bot_starting", mode="async_polling")
         
@@ -153,30 +160,82 @@ async def run_bot_async(application: Application) -> None:
         await application.start()
         logger.info("application_started")
         
-        # Start polling
-        await application.updater.start_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,
-        )
-        logger.info("polling_started")
-        
-        # Keep running (this blocks forever)
-        print("[BOT] ✅ Telegram Bot is now polling for updates")
-        
-        # This is a blocking wait, but it's async-safe
-        stop_signals = (signal.SIGINT, signal.SIGTERM)
-        loop = asyncio.get_event_loop()
-        future = loop.create_future()
-        
-        for sig in stop_signals:
-            loop.add_signal_handler(sig, future.set_result, None)
-        
-        try:
-            await future
-        finally:
-            for sig in stop_signals:
-                loop.remove_signal_handler(sig)
-        
+        while retry_count < max_retries:
+            try:
+                # Start polling with retry mechanism
+                logger.info(
+                    "polling_starting",
+                    attempt=retry_count + 1,
+                    max_retries=max_retries
+                )
+                
+                await application.updater.start_polling(
+                    allowed_updates=Update.ALL_TYPES,
+                    drop_pending_updates=False,  # Don't drop pending updates
+                    poll_interval=0.0,  # No delay between polls
+                    timeout=30,
+                    read_timeout=30,
+                    write_timeout=30,
+                    connect_timeout=30,
+                    pool_timeout=30,
+                )
+                logger.info("polling_started_successfully")
+                
+                # Keep running (this blocks forever or until error)
+                print("[BOT] ✅ Telegram Bot is now polling for updates")
+                
+                # This is a blocking wait, but it's async-safe
+                stop_signals = (signal.SIGINT, signal.SIGTERM)
+                loop = asyncio.get_event_loop()
+                future = loop.create_future()
+                
+                for sig in stop_signals:
+                    loop.add_signal_handler(sig, future.set_result, None)
+                
+                try:
+                    await future
+                    break  # Graceful exit
+                finally:
+                    for sig in stop_signals:
+                        loop.remove_signal_handler(sig)
+                    
+            except (NetworkError, TimedOut) as e:
+                retry_count += 1
+                logger.error(
+                    "polling_network_error",
+                    error=str(e),
+                    attempt=retry_count,
+                    max_retries=max_retries
+                )
+                
+                if retry_count < max_retries:
+                    logger.info(
+                        "polling_retry_scheduled",
+                        retry_delay=retry_delay,
+                        next_retry=retry_count + 1
+                    )
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 300)  # Exponential backoff, max 5 minutes
+                else:
+                    logger.critical("polling_max_retries_exceeded")
+                    raise
+                    
+            except TelegramError as e:
+                retry_count += 1
+                logger.error(
+                    "polling_telegram_error",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    attempt=retry_count
+                )
+                
+                if retry_count < max_retries:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 2, 300)
+                else:
+                    logger.critical("polling_max_retries_exceeded_telegram")
+                    raise
+                    
     except asyncio.CancelledError:
         logger.info("bot_cancelled")
         raise

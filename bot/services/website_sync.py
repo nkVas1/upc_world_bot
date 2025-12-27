@@ -194,18 +194,50 @@ class WebsiteSyncService:
             return []
     
     async def get_upcoming_events(self, limit: int = 5) -> list[Dict[str, Any]]:
-        """Get upcoming events from website."""
+        """Get upcoming events from website with fallback for missing endpoint."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     f"{self.base_url}/api/v1/events/upcoming?limit={limit}",
                     headers=self._get_headers()
                 )
-                response.raise_for_status()
-                return response.json()
                 
+                # Handle 404 gracefully - endpoint may not be implemented yet
+                if response.status_code == 404:
+                    logger.warning(
+                        "events_endpoint_not_found",
+                        url=f"{self.base_url}/api/v1/events/upcoming",
+                        status_code=404
+                    )
+                    return []
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                # Handle both single list and nested "events" key
+                if isinstance(data, list):
+                    return data
+                elif isinstance(data, dict) and "events" in data:
+                    return data["events"]
+                else:
+                    logger.warning("unexpected_events_response_format", data=data)
+                    return []
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "events_fetch_http_error",
+                error=str(e),
+                status_code=e.response.status_code
+            )
+            return []
+        except httpx.TimeoutException as e:
+            logger.error("events_fetch_timeout", error=str(e))
+            return []
         except httpx.HTTPError as e:
             logger.error("events_fetch_error", error=str(e))
+            return []
+        except Exception as e:
+            logger.error("events_fetch_unexpected_error", error=str(e), exc_info=True)
             return []
     
     async def validate_qr_code(self, qr_code: str) -> Optional[Dict[str, Any]]:

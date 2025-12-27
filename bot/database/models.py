@@ -2,6 +2,8 @@
 from datetime import datetime
 from typing import Optional
 from decimal import Decimal
+import secrets
+import string
 
 from sqlalchemy import (
     BigInteger, String, Integer, Boolean, DateTime, Text,
@@ -94,8 +96,23 @@ class User(Base):
         Index("idx_user_membership", "membership_level"),
     )
     
+    @staticmethod
+    def generate_referral_code(length: int = 6) -> str:
+        """
+        Generate unique referral code in format UP-XXXXXX.
+        
+        Args:
+            length: Length of random part (default 6 chars)
+            
+        Returns:
+            Referral code like "UP-A7K9M2"
+        """
+        chars = string.ascii_uppercase + string.digits
+        random_part = ''.join(secrets.choice(chars) for _ in range(length))
+        return f"UP-{random_part}"
+    
     def __repr__(self):
-        return f"<User(id={self.id}, username={self.username})>"
+        return f"<User(id={self.id}, username={self.username}, referral_code={self.referral_code})>"
 
 
 class Transaction(Base):
@@ -308,3 +325,28 @@ class AdminLog(Base):
         Index("idx_admin_log_admin", "admin_id"),
         Index("idx_admin_log_created", "created_at"),
     )
+
+
+class AuthCode(Base):
+    """Temporary authentication codes for one-time use."""
+    __tablename__ = "auth_codes"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    __table_args__ = (
+        Index("idx_auth_code_code", "code"),
+        Index("idx_auth_code_user", "user_id"),
+        Index("idx_auth_code_expires", "expires_at"),
+    )
+    
+    def is_expired(self) -> bool:
+        """Check if auth code has expired."""
+        return datetime.utcnow() > self.expires_at

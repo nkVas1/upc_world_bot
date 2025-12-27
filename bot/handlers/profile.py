@@ -18,11 +18,71 @@ from bot.utils.logger import logger
 from bot.utils.navigation import NavigationManager
 from bot.utils.token_storage import TokenStorage
 from bot.config import settings
+from bot.utils.token_storage import TokenStorage
+from bot.config import settings
 from bot.middlewares.auth import auth_middleware
 from bot.middlewares.logging import logging_middleware
 
 
-@auth_middleware
+def format_private_profile(user: dict) -> str:
+    """
+    Format PRIVATE profile for the owner.
+    Shows full data with sensitive information.
+    """
+    profile_text = (
+        "👤 <b>ЛИЧНЫЙ КАБИНЕТ</b>\n\n"
+        f"🆔 ID: <code>{user.get('telegram_id', 'N/A')}</code>\n"
+        f"📛 Имя: <b>{user.get('first_name', 'Anonymous')}</b>\n"
+        f"💰 Баланс: <b>{user.get('up_coins', 0)} UP Coins</b>\n"
+        f"🎖️ Статус: <b>{user.get('membership_level', 'guest').title()}</b>\n\n"
+    )
+    
+    if user.get('is_member'):
+        profile_text += f"✅ Вы являетесь членом клуба\n"
+    else:
+        profile_text += f"⚪ Вы гость клуба\n"
+    
+    profile_text += (
+        f"\n🔗 <b>Ваш реферальный код:</b> <code>{user.get('referral_code', 'N/A')}</code>\n"
+        f"📲 <b>Реферальная ссылка:</b>\n"
+        f"<code>https://t.me/{settings.bot_username}?start={user.get('referral_code', 'N/A')}</code>\n\n"
+        f"👥 <b>Приглашено:</b> {user.get('referral_count', 0)}\n"
+        f"💵 <b>Заработано:</b> {user.get('referral_earnings', 0)} UP Coins\n\n"
+        f"📊 <b>Статистика:</b>\n"
+        f"🎯 События: {user.get('total_events_attended', 0)}\n"
+        f"🔥 Серия дней: {user.get('daily_streak', 0)}\n"
+        f"💳 Потрачено: {user.get('total_spent', 0)} UP Coins\n"
+        f"📈 Заработано: {user.get('total_earned', 0)} UP Coins"
+    )
+    
+    return profile_text
+
+
+def format_public_profile(user: dict) -> str:
+    """
+    Format PUBLIC profile for viewing by other users.
+    Shows only non-sensitive information.
+    """
+    profile_text = (
+        f"👤 <b>ПРОФИЛЬ ЧЛЕНА КЛУБА</b>\n\n"
+        f"📛 {user.get('first_name', 'Anonymous')}\n"
+        f"🎖️ Статус: <b>{user.get('membership_level', 'guest').title()}</b>\n\n"
+    )
+    
+    if user.get('is_member'):
+        profile_text += "✅ Активный член клуба\n\n"
+    else:
+        profile_text += "⚪ Гость клуба\n\n"
+    
+    profile_text += (
+        f"📊 <b>Публичная статистика:</b>\n"
+        f"🎯 События посещены: {user.get('total_events_attended', 0)}\n"
+        f"👥 Рефералов приглашено: {user.get('referral_count', 0)}\n"
+        f"🏆 Достижения: {user.get('achievements_count', 0)}\n\n"
+        f"<i>Хотите узнать подробнее? Присоединяйтесь к нашему клубу!</i>"
+    )
+    
+    return profile_text
 @logging_middleware
 @handle_errors
 async def profile_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

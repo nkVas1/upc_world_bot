@@ -24,6 +24,9 @@ psycopg2-binary==2.9.10
 redis==5.2.0
 aioredis==2.0.1
 
+# Caching with aiocache
+aiocache[redis]==0.12.3
+
 # Web integration
 aiohttp==3.10.10
 httpx==0.27.2
