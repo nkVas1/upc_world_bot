@@ -63,6 +63,40 @@ app.add_middleware(
 logger.info("cors_configured", origins=cors_origins)
 
 
+# ========== CORS PREFLIGHT HANDLER ==========
+# Handle OPTIONS requests for CORS preflight (CRITICAL FIX)
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """Handle all OPTIONS preflight requests."""
+    return JSONResponse(
+        content={"status": "ok"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin, X-Requested-With, X-CSRF-Token",
+        }
+    )
+
+
+# ========== AUTH CODE STORAGE ==========
+# In-memory storage for auth codes (one-time use, 5 minute TTL)
+# TODO: In production, use Redis with expiry
+AUTH_CODES = {}  # {code: (user_id, timestamp)}
+
+
+def store_auth_code(code: str, user_id: int, ttl: int = 300):
+    """
+    Store auth code for user (one-time use, TTL-based expiry).
+    
+    Args:
+        code: Generated UUID code
+        user_id: Telegram user ID
+        ttl: Time to live in seconds (default 5 minutes)
+    """
+    AUTH_CODES[code] = (user_id, time.time() + ttl)
+    logger.info("auth_code_stored", code=code[:8], user_id=user_id, ttl=ttl)
+
+
 # ========== MODELS ==========
 class TelegramAuthData(BaseModel):
     """Telegram Widget Authentication Data."""
@@ -181,6 +215,86 @@ def verify_access_token(token: str) -> dict:
 
 
 # ========== ENDPOINTS ==========
+
+# CRITICAL FIX: Add POST /api/auth/callback endpoint (was missing!)
+@app.post("/api/auth/callback", response_model=AuthResponse)
+async def auth_callback(request: AuthCodeRequest):
+    """
+    Exchange one-time code for JWT token.
+    Called by frontend after user returns from Telegram bot with code.
+    
+    Flow:
+    1. User clicks "Войти" in bot
+    2. Bot generates UUID code via store_auth_code()
+    3. Bot sends deep link with ?code=xxx
+    4. User clicks link → returns to website with code in URL
+    5. Website calls this endpoint with code in body
+    6. Returns JWT token for authenticated API calls
+    """
+    try:
+        logger.info("auth_callback_received", code=request.code[:8])
+        
+        code = request.code
+        
+        # Get user_id from code storage
+        if code not in AUTH_CODES:
+            logger.warning("auth_code_invalid", code=code[:8])
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid or expired authorization code"
+            )
+        
+        user_id, expiry_time = AUTH_CODES[code]
+        
+        # Check if code expired
+        if time.time() > expiry_time:
+            del AUTH_CODES[code]
+            logger.warning("auth_code_expired", code=code[:8], user_id=user_id)
+            raise HTTPException(
+                status_code=403,
+                detail="Authorization code expired"
+            )
+        
+        # Delete code immediately (one-time use only!)
+        del AUTH_CODES[code]
+        
+        # Get user from database
+        async with db_manager.session() as session:
+            user_repo = UserRepository(session)
+            user = await user_repo.get_by_id(user_id)
+            
+            if not user:
+                logger.error("auth_code_user_not_found", user_id=user_id)
+                raise HTTPException(
+                    status_code=404,
+                    detail="User not found"
+                )
+        
+        # Generate JWT token
+        access_token = create_access_token(
+            user_id=user_id,
+            username=user.username
+        )
+        
+        logger.info("auth_success", user_id=user_id)
+        
+        return AuthResponse(
+            access_token=access_token,
+            user={
+                "id": user_id,
+                "username": user.username,
+                "first_name": user.first_name,
+                "role": "member" if getattr(user, 'is_member', False) else "guest"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("auth_callback_error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @app.post("/api/auth/code/exchange", response_model=AuthResponse)
 async def exchange_auth_code(request: AuthCodeRequest):
     """

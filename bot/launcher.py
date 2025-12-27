@@ -1,6 +1,6 @@
 """
-Unified entry point for running Bot and API server together.
-This is used in production (Railway) to start both services.
+Unified launcher for Bot + API (Railway Production)
+Runs Telegram bot polling and FastAPI server concurrently.
 """
 import asyncio
 import os
@@ -8,128 +8,140 @@ import sys
 import signal
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add project root
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Critical startup logging BEFORE any imports
 print("=" * 70)
 print("🚀 Starting UPC World Bot v3.0 with API Server")
 print("=" * 70)
-print(f"Python version: {sys.version}")
-print(f"Working directory: {os.getcwd()}")
+print(f"Python: {sys.version}")
+print(f"CWD: {os.getcwd()}")
 print()
 
-import uvicorn
-from bot.config import settings
-from bot.utils.logger import logger
 
-
-async def run_bot():
+async def start_bot():
     """Start Telegram bot in polling mode."""
     try:
         print("[BOT] Loading bot modules...")
-        from bot.main import Application
         
-        app = Application()
-        await app.initialize()
+        # Import AFTER sys.path is set
+        from bot.main import create_application, run_polling
+        from bot.utils.logger import logger
         
-        print("[BOT] ✅ Bot initialized")
-        print("[BOT] Starting polling...")
+        logger.info("bot_task_starting")
         
-        await app.start()
-        print("[BOT] 🤖 Telegram Bot polling started")
+        # Create application
+        app = await create_application()
         
-        # Keep bot running
-        await app.updater.start_polling()
-        print("[BOT] Waiting for updates...")
+        print("[BOT] ✅ Application created successfully")
+        print("[BOT] 🤖 Starting Telegram Bot polling...")
+        
+        # Run polling (blocks forever)
+        run_polling(app)
         
     except Exception as e:
-        logger.error("bot_startup_error", error=str(e))
         print(f"[BOT] ❌ Bot error: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 
-async def run_api():
+async def start_api():
     """Start FastAPI server."""
     try:
         print("[API] Starting FastAPI server...")
         
-        # Get port from environment (Railway sets $PORT dynamically)
-        port = int(os.getenv("PORT", "8000"))
-        host = os.getenv("HOST", "0.0.0.0")
+        import uvicorn
+        from bot.api_server import app
+        from bot.utils.logger import logger
         
+        logger.info("api_task_starting")
+        
+        # Get port from environment (Railway sets PORT dynamically)
+        port = int(os.getenv("PORT", "8000"))
+        host = "0.0.0.0"  # Listen on all interfaces for Railway
+        
+        # FIXED: Removed invalid shutdown_delay parameter
+        # Only use parameters that exist in uvicorn.Config
         config = uvicorn.Config(
-            "bot.api_server:app",
+            app,  # Pass app object directly
             host=host,
             port=port,
             log_level="info",
             access_log=True,
-            timeout_keep_alive=75,  # Keep-alive timeout for Railway proxy
-            timeout_notify=30,       # Graceful shutdown timeout
+            timeout_keep_alive=75,  # For Railway proxy timeout
         )
         
         server = uvicorn.Server(config)
         
-        print(f"[API] 🌐 FastAPI server starting on {host}:{port}")
-        print(f"[API] 📚 API Documentation: http://localhost:{port}/docs")
-        print(f"[API] ✅ Health check: http://localhost:{port}/api/health")
+        print(f"[API] 🌐 API starting on {host}:{port}")
+        print(f"[API] 📚 Docs: http://localhost:{port}/docs")
+        print(f"[API] ✅ Health: http://localhost:{port}/api/health")
         
+        logger.info("cors_configured")
+        
+        # Start server (blocks forever)
         await server.serve()
         
     except Exception as e:
-        logger.error("api_startup_error", error=str(e))
         print(f"[API] ❌ API error: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 
 async def main():
-    """Run both bot and API server concurrently."""
+    """Run bot and API concurrently."""
     try:
-        print("\n" + "=" * 70)
+        print()
+        print("=" * 70)
         print("Starting services in parallel mode...")
-        print("=" * 70 + "\n")
+        print("=" * 70)
+        print()
         
-        # Create tasks for bot and API
-        # Note: In this implementation, we run API in the main event loop
-        # and bot will use polling
+        # Create tasks
+        bot_task = asyncio.create_task(start_bot(), name="bot")
+        api_task = asyncio.create_task(start_api(), name="api")
         
-        # Run both concurrently
-        tasks = [
-            asyncio.create_task(run_api()),
-            asyncio.create_task(run_bot()),
-        ]
+        # Wait for both (they run forever)
+        done, pending = await asyncio.wait(
+            [bot_task, api_task],
+            return_when=asyncio.FIRST_EXCEPTION  # Stop if one fails
+        )
         
-        # Wait for both tasks (they should run indefinitely)
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # If any task fails, log and exit
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                print(f"❌ Task {i} failed: {result}")
+        # If we reach here, one task crashed
+        for task in done:
+            if task.exception():
+                print(f"❌ Task '{task.get_name()}' failed:")
+                print(f"   {task.exception()}")
                 
+        # Cancel remaining tasks
+        for task in pending:
+            task.cancel()
+            
+        sys.exit(1)
+        
     except KeyboardInterrupt:
-        print("\n[MAIN] ⚠️  Received interrupt signal")
-        print("[MAIN] Shutting down gracefully...")
+        print("\n[MAIN] ⚠️  Interrupt received, shutting down...")
         sys.exit(0)
     except Exception as e:
-        logger.error("main_error", error=str(e))
         print(f"[MAIN] ❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    try:
-        # Set up signal handlers for graceful shutdown
-        def signal_handler(sig, frame):
-            print("\n[MAIN] Received signal, shutting down...")
-            sys.exit(0)
-        
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-        
-        # Run main
-        asyncio.run(main())
-        
-    except KeyboardInterrupt:
-        print("\n[MAIN] Bot and API stopped")
+    # Signal handlers
+    def handle_signal(sig, frame):
+        print(f"\n[MAIN] Signal {sig} received, exiting...")
         sys.exit(0)
+    
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+    
+    # Run
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n[MAIN] Stopped")
