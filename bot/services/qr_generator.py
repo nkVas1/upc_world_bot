@@ -93,3 +93,23 @@ class QRCodeGenerator:
         
         logger.info("qr_generated", referral_code=referral_code, type="referral", url=referral_url)
         return buffer
+    
+    def generate_access_code_qr(self, auth_url: str) -> BytesIO:
+        """Generate QR code for authentication/access code."""
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(auth_url)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        logger.info("qr_generated", type="access_code", url=auth_url)
+        return buffer

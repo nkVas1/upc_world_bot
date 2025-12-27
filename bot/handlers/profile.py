@@ -1,6 +1,7 @@
 """Profile and user management handlers."""
 from datetime import datetime
 from decimal import Decimal
+from uuid import uuid4
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
@@ -15,6 +16,8 @@ from bot.utils.decorators import handle_errors
 from bot.utils.formatters import fmt
 from bot.utils.logger import logger
 from bot.utils.navigation import NavigationManager
+from bot.utils.token_storage import TokenStorage
+from bot.config import settings
 from bot.middlewares.auth import auth_middleware
 from bot.middlewares.logging import logging_middleware
 
@@ -171,7 +174,7 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 @handle_errors
 async def profile_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Generate and send user profile QR code."""
+    """Generate and send user profile QR code with access code."""
     query = update.callback_query
     await query.answer("Генерируем QR-код...")
     
@@ -184,18 +187,21 @@ async def profile_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await query.answer("❌ Профиль не найден", show_alert=True)
                 return
             
-            referral_code = user.referral_code or f"UP-{user.id}"
+            # Generate one-time access code for WebApp authentication
+            access_code = str(uuid4())
+            TokenStorage.add_code(access_code, user.id)
             
+            # Create authentication URL with access code
+            auth_url = f"{settings.website_url}/auth/callback?code={access_code}"
+            
+            # Generate QR code for the authentication URL
             qr_generator = QRCodeGenerator()
-            qr_image = qr_generator.generate_user_profile_qr(
-                query.from_user.id,
-                query.from_user.username
-            )
+            qr_image = qr_generator.generate_access_code_qr(auth_url)
             
             caption = (
-                "📱 *Ваш QR\\-код профиля*\n\n"
-                f"Ссылка: `https://under\\-people\\-club\\.vercel\\.app/u/{referral_code}`\n\n"
-                "_Покажите этот код на входе для быстрой идентификации\\!_"
+                "📱 *Ваш QR\\-код для входа*\n\n"
+                "Отсканируйте QR\\-код чтобы войти в веб\\-версию\\.\n\n"
+                "_Код действителен 15 минут\\._"
             )
             
             # QR sends as photo, not text message
@@ -207,7 +213,7 @@ async def profile_qr_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             
             # Don't change navigation message - user stays on current screen
-            logger.info("qr_code_sent", user_id=query.from_user.id)
+            logger.info("qr_code_sent", user_id=query.from_user.id, type="auth")
     except Exception as e:
         logger.error("qr_code_error", error=str(e), user_id=query.from_user.id)
         await query.answer("❌ Ошибка при генерации QR-кода", show_alert=True)

@@ -8,7 +8,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Body, Depends
+from fastapi import FastAPI, HTTPException, Body, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -510,7 +510,7 @@ async def telegram_login(auth_data: TelegramAuthData):
 
 
 @app.get("/api/users/me", response_model=UserProfileResponse)
-async def get_user_profile(authorization: str = None):
+async def get_user_profile(authorization: str = Header(None)):
     """
     Get current user's profile using JWT token.
     
